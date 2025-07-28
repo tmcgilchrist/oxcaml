@@ -67,6 +67,10 @@ jobs:
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
+          - name: flambda2_macos_amd64
+            config: --enable-middle-end=flambda2 --disable-warn-error --enable-frame-pointers
+            os: macos-14
+
           - name: flambda2_macos_arm64
             config: --enable-middle-end=flambda2 --disable-warn-error
             os: macos-latest
@@ -165,7 +169,7 @@ jobs:
       # run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install afl-fuzz
 
     - name: Install autoconf (for macOS workers)
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-latest' || matrix.os == 'macos-14'
       run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf
 
       # NB. The "rev" number in the cache key below must be updated each time
