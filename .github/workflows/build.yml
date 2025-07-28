@@ -262,7 +262,7 @@ jobs:
           ${{ matrix.config }}
 
     - name: Setup for saving core files (not for macOS)
-      if: matrix.os != 'macos-latest'
+      if: matrix.os == 'ubunutu-latest'
       run: |
         sudo mkdir /cores
         sudo chmod 777 /cores
