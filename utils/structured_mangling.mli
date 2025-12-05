@@ -1,12 +1,13 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                          Tim McGilchrist, Tarides                          *
+ *                  Samuel Hym and Tim McGilchrist, Tarides                   *
  *                          Simon Spies, Jane Street                          *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
  * Copyright (c) 2025 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
+ * Copyright (c) 2025 Tarides                                                 *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
  * copy of this software and associated documentation files (the "Software"), *
