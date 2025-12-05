@@ -210,7 +210,8 @@ val with_cpp_mangling : bool
 (** Whether symbol names should be following the cpp mangling convention *)
 
 type name_mangling_version =
-  | LegacyOCaml
+  | Flat
+
 exception Invalid_name_mangling_version of string
 
 val name_mangling_version : name_mangling_version

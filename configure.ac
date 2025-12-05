@@ -594,12 +594,12 @@ AC_ARG_ENABLE([cpp-mangling],
 
 AC_ARG_ENABLE([name-mangling],
   [AS_HELP_STRING([--enable-name-mangling=VERSION],
-    [specify name mangling version (LegacyOCaml, default: LegacyOCaml)])],
+    [specify name mangling version (flat, default: flat)])],
   [AS_CASE([$enable_name_mangling],
-    [LegacyOCaml], [name_mangling_version=LegacyOCaml],
-    [yes], [name_mangling_version=LegacyOCaml],
-    [*], [AC_MSG_ERROR([Invalid name mangling version: must be 'LegacyOCaml'])])],
-  [name_mangling_version=LegacyOCaml])
+    [flat], [name_mangling_version=flat],
+    [yes], [name_mangling_version=flat],
+    [*], [AC_MSG_ERROR([Invalid name mangling version: must be 'flat'])])],
+  [name_mangling_version=flat])
 
 AC_ARG_ENABLE([naked-pointers], [],
   [AS_IF([test "x$enableval" != 'xno'],
@@ -2756,7 +2756,7 @@ AS_IF([test x"$enable_cpp_mangling" = "xyes"],
 ## Name mangling version
 
 AS_CASE([$name_mangling_version],
-  [LegacyOCaml], [AC_DEFINE([NAME_MANGLING_LEGACY_OCAML])])
+  [flat], [AC_DEFINE([NAME_MANGLING_FLAT])])
 
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES

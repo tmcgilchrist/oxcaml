@@ -37,7 +37,7 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
   in
   let linkage_name =
     match Config.name_mangling_version with
-    | LegacyOCaml -> Some (linkage_name_from_debug ())
+    | Flat -> Some (linkage_name_from_debug ())
   in
   let start_sym = Asm_symbol.create fun_name in
   let location_attributes =

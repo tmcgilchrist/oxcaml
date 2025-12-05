@@ -834,7 +834,7 @@ module Code_id = struct
     in
     let linkage_name =
       match Config.name_mangling_version with
-      | Config.LegacyOCaml ->
+      | Flat ->
         let name =
           if Flambda_features.Expert.shorten_symbol_names ()
           then Printf.sprintf "%s_%d" name name_stamp
