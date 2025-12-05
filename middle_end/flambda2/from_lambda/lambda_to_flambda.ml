@@ -47,12 +47,12 @@ let print_compact_location ppf (loc : Location.t) =
 
 let name_for_function (func : Lambda.lfunction) =
   (* Name anonymous functions by their source location, if known. Not necessary
-     for the runlength encoding, because it uses the debug info to generate more
+     for structured mangling, because it uses the debug info to generate more
      informative names. *)
   let mangling_scheme_locates_anonymous_functions =
     match Config.name_mangling_version with
     | LegacyOCaml -> false
-    | RunLengthEncoding -> true
+    | Structured -> true
   in
   match func.loc with
   | Loc_unknown -> "fn"

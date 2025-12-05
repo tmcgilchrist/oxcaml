@@ -32,9 +32,9 @@ val unsafe_create : Compilation_unit.t -> Linkage_name.t -> t
 
 val for_name : Compilation_unit.t -> string -> t
 
-val for_runlength_encoding_path :
+val for_structured_mangling_path :
     compilation_unit:Compilation_unit.t ->
-    path:Runlength_mangling.path ->
+    path:Structured_mangling.path ->
     suffix:string ->
     t
 

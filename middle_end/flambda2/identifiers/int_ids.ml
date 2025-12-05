@@ -841,7 +841,7 @@ module Code_id = struct
           else Printf.sprintf "%s_%d_code" name name_stamp
         in
         Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
-      | Config.RunLengthEncoding ->
+      | Structured ->
         let suffix =
           if Flambda_features.Expert.shorten_symbol_names ()
           then Printf.sprintf "_%d" name_stamp
@@ -850,9 +850,9 @@ module Code_id = struct
         (* CR sspies: Note that the fallback name still contains the additional
            stamp. *)
         let path =
-          Debuginfo.to_runlength_mangling_path ~fallback_name:name debug
+          Debuginfo.to_structured_mangling_path ~fallback_name:name debug
         in
-        Symbol0.for_runlength_encoding_path ~compilation_unit ~path ~suffix
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
         |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =

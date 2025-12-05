@@ -72,7 +72,7 @@ let default_executable_name =
 
 type name_mangling_version =
   | LegacyOCaml
-  | RunLengthEncoding
+  | Structured
 
 exception Invalid_name_mangling_version of string
 
@@ -195,5 +195,5 @@ let merlin = false
 let name_mangling_version =
   match name_mangling_version_string with
   | "LegacyOCaml" -> LegacyOCaml
-  | "RunLengthEncoding" -> RunLengthEncoding
+  | "structured" -> Structured
   | s -> raise (Invalid_name_mangling_version s)

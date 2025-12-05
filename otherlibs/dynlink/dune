@@ -145,7 +145,7 @@
   lambda
   runtimedef
   runtimetags
-  runlength_mangling
+  structured_mangling
   instruct
   opcodes
   bytesections
@@ -188,7 +188,7 @@
 
 (copy_files ../../utils/runtimetags.ml)
 
-(copy_files ../../utils/runlength_mangling.ml)
+(copy_files ../../utils/structured_mangling.ml)
 
 (copy_files ../../utils/binutils.ml)
 
@@ -352,7 +352,7 @@
 
 (copy_files ../../utils/runtimetags.mli)
 
-(copy_files ../../utils/runlength_mangling.mli)
+(copy_files ../../utils/structured_mangling.mli)
 
 (copy_files ../../utils/binutils.mli)
 
@@ -599,7 +599,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Compilation_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Import_info.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Linkage_name.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runlength_mangling.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Structured_mangling.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Symbol.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Docstrings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lexer.cmo
@@ -699,7 +699,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Compilation_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Import_info.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Linkage_name.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runlength_mangling.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Structured_mangling.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Symbol.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Docstrings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lexer.cmx

@@ -46,7 +46,7 @@ module Scoped_location = struct
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Runlength_mangling.path_item option}
+               mangling_item: Structured_mangling.path_item option}
 
   let str = function
     | Empty -> ""
@@ -82,17 +82,16 @@ module Scoped_location = struct
   let enter_anonymous_function ~scopes ~assume_zero_alloc ~loc =
     let str = str_fun scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let mangling_item : Runlength_mangling.path_item option =
+    let mangling_item : Structured_mangling.path_item option =
       Some (AnonymousFunction (line, col, Some file))
     in
-    (* CR sspies: The column numbers here are off. Look into that. *)
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
           assume_zero_alloc; mangling_item }
 
   let enter_anonymous_module ~scopes ~loc =
     let str = str scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let mangling_item : Runlength_mangling.path_item option =
+    let mangling_item : Structured_mangling.path_item option =
       Some (AnonymousModule (line, col, Some file))
     in
     (* CR tmcgilchrist: Consider only including file name, currently we get
@@ -451,7 +450,7 @@ let rec path_of_debug_info_scopes (scopes: Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _} ->
       mangling_item :: (path_of_debug_info_scopes prev)
 
-let to_runlength_mangling_path ~fallback_name dbg : Runlength_mangling.path =
+let to_structured_mangling_path ~fallback_name dbg : Structured_mangling.path =
   match to_items dbg with
   | [] -> [NamedFunction fallback_name]
   | item :: _ -> path_of_debug_info_scopes item.dinfo_scopes |> List.rev

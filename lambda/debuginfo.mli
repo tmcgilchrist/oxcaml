@@ -31,7 +31,7 @@ module Scoped_location : sig
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Runlength_mangling.path_item option}
+               mangling_item: Structured_mangling.path_item option}
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
@@ -124,11 +124,11 @@ val merge : into:t -> t -> t
 
 val assume_zero_alloc : t -> ZA.Assume_info.t
 
-(** [to_runlength_mangling_path] converts the debug info into a mangling path.
+(** [to_structured_mangling_path] converts the debug info into a mangling path.
       If the debug info is empty, the fallback name is used to populate the
       path. *)
-val to_runlength_mangling_path :
-  fallback_name:string -> t -> Runlength_mangling.path
+val to_structured_mangling_path :
+  fallback_name:string -> t -> Structured_mangling.path
 
 
 module Dbg : sig
