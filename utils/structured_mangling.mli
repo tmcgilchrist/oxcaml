@@ -30,10 +30,10 @@
 
 type path_item =
   | Module of string
-  | AnonymousFunction of int * int * string option
-  | NamedFunction of string
-  | PartialFunction
-  | AnonymousModule of int * int * string option
+  | Anonymous_function of int * int * string option
+  | Named_function of string
+  | Partial_function
+  | Anonymous_module of int * int * string option
 
 type path = path_item list
 

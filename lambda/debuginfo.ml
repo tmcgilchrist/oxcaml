@@ -83,7 +83,7 @@ module Scoped_location = struct
     let str = str_fun scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let mangling_item : Structured_mangling.path_item option =
-      Some (AnonymousFunction (line, col, Some file))
+      Some (Anonymous_function (line, col, Some file))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
           assume_zero_alloc; mangling_item }
@@ -92,7 +92,7 @@ module Scoped_location = struct
     let str = str scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let mangling_item : Structured_mangling.path_item option =
-      Some (AnonymousModule (line, col, Some file))
+      Some (Anonymous_module (line, col, Some file))
     in
     (* CR tmcgilchrist: Consider only including file name, currently we get
        full relative paths in symbols. *)
@@ -102,7 +102,7 @@ module Scoped_location = struct
 
   let enter_value_definition ~scopes ~assume_zero_alloc id =
     cons scopes Sc_value_definition (dot scopes (Ident.name id)) (Ident.name id)
-      (Some (NamedFunction (Ident.name id)))
+      (Some (Named_function (Ident.name id)))
       ~assume_zero_alloc
 
   let enter_compilation_unit ~scopes cu =
@@ -127,14 +127,14 @@ module Scoped_location = struct
       | _ -> dot scopes s
     in
     cons scopes Sc_method_definition str s
-      ~assume_zero_alloc:ZA.Assume_info.none (Some (NamedFunction str))
+      ~assume_zero_alloc:ZA.Assume_info.none (Some (Named_function str))
 
   let enter_lazy ~scopes = cons scopes Sc_lazy (str scopes) ""
                              ~assume_zero_alloc:ZA.Assume_info.none None
 
   let enter_partial_or_eta_wrapper ~scopes =
     cons scopes Sc_partial_or_eta_wrapper (dot ~no_parens:() scopes "(partial)") ""
-      ~assume_zero_alloc:ZA.Assume_info.none (Some PartialFunction)
+      ~assume_zero_alloc:ZA.Assume_info.none (Some Partial_function)
 
   let update_assume_zero_alloc ~scopes ~assume_zero_alloc =
     match scopes with
@@ -442,17 +442,16 @@ let assume_zero_alloc t = t.assume_zero_alloc
 
 let get_dbg t = t.dbg
 
-let rec path_of_debug_info_scopes (scopes: Scoped_location.scopes) =
+let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   match scopes with
-  | Empty -> []
-  | Cons { prev; mangling_item = None; _} ->
-      path_of_debug_info_scopes prev
-  | Cons { prev; mangling_item = Some mangling_item; _} ->
-      mangling_item :: (path_of_debug_info_scopes prev)
+  | Empty -> List.rev acc
+  | Cons { prev; mangling_item = None; _ } -> path_of_debug_info_scopes acc prev
+  | Cons { prev; mangling_item = Some mangling_item; _ } ->
+    path_of_debug_info_scopes (mangling_item :: acc) prev
 
 let to_structured_mangling_path ~fallback_name dbg : Structured_mangling.path =
   match to_items dbg with
-  | [] -> [NamedFunction fallback_name]
-  | item :: _ -> path_of_debug_info_scopes item.dinfo_scopes |> List.rev
+  | [] -> [Named_function fallback_name]
+  | item :: _ -> path_of_debug_info_scopes [] item.dinfo_scopes
   (* CR spies: This should be looked at again.
     How can we have multiple debug entries here? *)

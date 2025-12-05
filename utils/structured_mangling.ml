@@ -30,10 +30,10 @@
 
 type path_item =
   | Module of string (* M *)
-  | AnonymousFunction of int * int * string option (* L *)
-  | NamedFunction of string (* F *)
-  | PartialFunction (* P *)
-  | AnonymousModule of int * int * string option (* S *)
+  | Anonymous_function of int * int * string option (* L *)
+  | Named_function of string (* F *)
+  | Partial_function (* P *)
+  | Anonymous_module of int * int * string option (* S *)
 
 type path = path_item list
 
@@ -99,16 +99,16 @@ let run_length_encode sym =
 
 let mangle_chunk = function
   | Module sym -> "M" ^ run_length_encode sym
-  | NamedFunction sym -> "F" ^ run_length_encode sym
-  | AnonymousFunction (line, col, file_opt) ->
+  | Named_function sym -> "F" ^ run_length_encode sym
+  | Anonymous_function (line, col, file_opt) ->
     let file_name = Option.value ~default:"" file_opt in
     let ts = Printf.sprintf "%s_%d_%d" file_name line col in
     "L" ^ run_length_encode ts
-  | AnonymousModule (line, col, file_opt) ->
+  | Anonymous_module (line, col, file_opt) ->
     let file_name = Option.value ~default:"" file_opt in
     let ts = Printf.sprintf "%s_%d_%d" file_name line col in
     "S" ^ run_length_encode ts
-  | PartialFunction -> "P"
+  | Partial_function -> "P"
 
 let mangle_path (path : path) : string =
   let b = Buffer.create 10 in
