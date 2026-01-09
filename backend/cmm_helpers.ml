@@ -4196,15 +4196,13 @@ let make_symbol ?compilation_unit name =
     | None -> Compilation_unit.get_current_exn ()
     | Some compilation_unit -> compilation_unit
   in
-  (* CR sspies: Changing the mangling here handles cases like the entry point
-     for modules, the code begin/end labels, and the like. Changing the mangling
-     scheme here leads to trouble with hardcoded names in the assembly code for
-     frame tables (and probably also the runtime). The names need to be updated
-     there as well, ideally based on the configure option. For frame tables, one
-     possible hack is to check for [String.ends_with ~suffix:"frametable" name].
-     An intermediate solution would be to find all the cases where names are
-     accessible from the runtime and use the legacy names for them via a
-     separate version of [make_symbol]. For now we use legacy mangling here. *)
+  (* CR sspies: [make_symbol] always uses flat name mangling. Structured
+     mangling can currently only be enabled for functions with a code id. It
+     could, in principle, also be used for other symbols such as module entry
+     points, frame tables, etc. If desired, structured mangling for these can be
+     enabled here in [make_symbol] BUT this requires additional changes, since
+     other parts of the compiler currently hardcode the symbol names for (at
+     least) frame tables. *)
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
 
