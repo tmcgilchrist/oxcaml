@@ -36,7 +36,7 @@ let tag_module = "M"
 
 let tag_anonymous_module = "S" (* struct *)
 
-let tag_class = "C"
+let tag_class = "O"
 
 let tag_function = "F"
 
@@ -55,10 +55,10 @@ type path_item =
 
 type path = path_item list
 
-(** [is_out_char c] is true iff [c] is in the output character set, ie the
+(** [is_out_char c] is true iff [c] is in the output character set, i.e., the
     restricted set of characters that are allowed in our mangled symbols. That
-    set is constrained by portability across OSes and toolchains and so is
-    restricted to just ASCII alphanumeric and underscore characters *)
+    set is constrained by portability across operating systems and architectures
+    and so is restricted to just ASCII alphanumeric and underscore characters. *)
 let is_out_char = function
   | '0' .. '9' | 'A' .. 'Z' | 'a' .. 'z' | '_' -> true
   | _ -> false
@@ -67,6 +67,8 @@ let is_out_char = function
     into the buffer [buf], with [A] standing for 0, [B] for 1, ..., [Z] for 25,
     [BA] for 26, [BB] for 27, ... *)
 let rec base26 buf n =
+  (* Technically, we are not constrained to just 26 characters here. Uniqueness
+     is still preserved if we include non-hex characters (i.e., [[g-z]]). *)
   let upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" in
   let r = n mod 26 and q = n / 26 in
   if q > 0 then base26 buf q;
@@ -133,12 +135,14 @@ type encode_state =
   | Raw
   | Esc
 
-(* [require_escaping str] is [true] iff [str] contains a non-output character or
-   if it starts with a digit (which could happen at least for anonymous modules
-   or functions coming from a file whose name starts with a digit; this yields a
-   warning but it is tolerated by the compiler so should also be tolerated by
-   the mangling scheme), so that it can be non-ambiguously appended to a decimal
-   integer to represent its length *)
+(** [require_escaping str] is [true] iff (a) [str] contains a non-output
+    character or (b) it starts with a digit. The latter is important to ensure
+    that the encoded string can be non-ambiguously appended to the decimal
+    integer representing its length in the mangling scheme.
+
+    While not very common, identifiers that start with a digit can happen for
+    anonymous modules and functions from a file whose name starts with a digit.
+    For those, the compiler emits a warning but tolerates them. *)
 let require_escaping str =
   String.length str > 0
   &&
@@ -147,16 +151,16 @@ let require_escaping str =
   | _ -> not (String.for_all is_out_char str)
 
 let rec encode buf str =
-  if require_escaping str
-  then (
+  if not (require_escaping str)
+  then Printf.bprintf buf "%d%s" (String.length str) str
+  else
     let raw = Buffer.create (String.length str)
     and escaped = Buffer.create (2 * String.length str)
     and ins_pos = ref 0 in
     encode_split_parts str raw escaped ins_pos 0 Raw;
     Printf.bprintf buf "u%d%a_%a"
       (Buffer.length escaped + Buffer.length raw + 1)
-      Buffer.add_buffer escaped Buffer.add_buffer raw)
-  else Printf.bprintf buf "%d%s" (String.length str) str
+      Buffer.add_buffer escaped Buffer.add_buffer raw
 
 and encode_split_parts str raw escaped ins_pos i = function
   | _ when i >= String.length str -> ()
@@ -181,30 +185,30 @@ and encode_split_parts str raw escaped ins_pos i = function
       encode_split_parts str raw escaped ins_pos (i + 1) Esc)
 
 let mangle_path_item buf path_item =
-  let output tag sym = Printf.bprintf buf "%s%a" tag encode sym in
-  let output_loc ~line ~col ~file_opt tag =
+  let tag_prefixed ~tag sym = Printf.bprintf buf "%s%a" tag encode sym in
+  let tag_prefixed_loc ~line ~col ~file_opt ~tag =
     let file_name = Option.value ~default:"" file_opt in
     let ts = Printf.sprintf "%s_%d_%d" file_name line col in
-    output tag ts
+    tag_prefixed ~tag ts
   in
   match path_item with
-  | Compilation_unit sym -> output tag_compilation_unit sym
-  | Module sym -> output tag_module sym
+  | Compilation_unit sym -> tag_prefixed ~tag:tag_compilation_unit sym
+  | Module sym -> tag_prefixed ~tag:tag_module sym
   | Anonymous_module (line, col, file_opt) ->
-    output_loc ~line ~col ~file_opt tag_anonymous_module
-  | Class sym -> output tag_class sym
-  | Function sym -> output tag_function sym
+    tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_module
+  | Class sym -> tag_prefixed ~tag:tag_class sym
+  | Function sym -> tag_prefixed ~tag:tag_function sym
   | Anonymous_function (line, col, file_opt) ->
-    output_loc ~line ~col ~file_opt tag_anonymous_function
+    tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_function
   | Partial_function (line, col, file_opt) ->
-    output_loc ~line ~col ~file_opt tag_partial_function
+    tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
 
 let mangle_path buf path =
   List.iter (fun pi -> Printf.bprintf buf "%a" mangle_path_item pi) path
 
 let path_from_comp_unit (cu : Compilation_unit.t) : path =
-  (* CR sspies Use the Flat mangling scheme for parameterised libraries for now,
-     a Structured version is postponed to a future PR *)
+  (* CR sspies: Use the Flat mangling scheme for parameterised libraries for
+     now, a Structured version is postponed to a future PR. *)
   let instance_separator = "____" in
   let instance_separator_depth_char = '_' in
   Compilation_unit.full_path_with_arguments_as_strings ~instance_separator
