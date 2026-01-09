@@ -28,17 +28,47 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type path_item =
-  | Compilation_unit of string
-  | Module of string
-  | Anonymous_module of int * int * string option
-  | Class of string
-  | Function of string
-  | Anonymous_function of int * int * string option
-  | Partial_function of int * int * string option
+(** Structured name mangling for OxCaml symbols.
 
+    This module implements a mangling scheme that encodes OCaml identifiers into
+    a restricted character set (ASCII alphanumeric and underscore) suitable for
+    use in linker symbols. The scheme preserves the lexical structure of the
+    source program by encoding each scope (compilation unit, module, function,
+    etc.) as a tagged path item.
+
+    {2 Mangled symbol format}
+
+    A mangled symbol has the form [_Caml<path>] where [<path>] is a sequence of
+    tagged, length-prefixed identifiers:
+    - [U] - compilation Unit
+    - [M] - Module
+    - [S] - anonymous Struct
+    - [O] - class (O for object)
+    - [F] - Function
+    - [L] - anonymous function (L for lambda)
+    - [P] - Partial application
+
+    For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
+    [_CamlU3FooM3BarF3baz]. *)
+
+(** A path item represents a single lexical scope in the mangling path. *)
+type path_item =
+  | Compilation_unit of string  (** A compilation unit (file) *)
+  | Module of string  (** A named module *)
+  | Anonymous_module of int * int * string option
+      (** [struct ... end] at (line, col, file) *)
+  | Class of string  (** A class definition *)
+  | Function of string  (** A named function *)
+  | Anonymous_function of int * int * string option
+      (** [fun ... -> ...] at (line, col, file) *)
+  | Partial_function of int * int * string option
+      (** A partial application at (line, col, file) *)
+
+(** A mangling path is a list of path items representing the full lexical
+    context of an identifier. *)
 type path = path_item list
 
+(** Construct a mangling path from a compilation unit. *)
 val path_from_comp_unit : Compilation_unit.t -> path
 
 (** Transform a {!Compilation_unit.t} and a {!path} into a mangled name suitable

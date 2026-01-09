@@ -83,7 +83,7 @@ let hex buf c =
   Buffer.add_char buf chars.[h];
   Buffer.add_char buf chars.[l]
 
-(** Encode an arbitrary string into the output character set (ie [[0-9A-Za-z_]],
+(** Encode an arbitrary string into the output character set (i.e., [[0-9A-Za-z_]],
     see {!is_out_char} for more details)
 
     The encoded string is composed of:
@@ -105,7 +105,7 @@ let hex buf c =
       - encode its relative insertion position as a base-26 number (see
         {!base26}),
       - encode every character in that chunk by the hexadecimal code of each byte,
-        using lowercase letters (ie [[0-9a-f]], see {!hex}),}
+        using lowercase letters (i.e., [[0-9a-f]], see {!hex}),}
     {- the separator character [_],}
     {- the string of output characters.}}
 
@@ -129,8 +129,10 @@ let hex buf c =
     - [func'sub'] is decomposed into [funcsub], ['] (so [27]) to insert at
       position 4 (so [E]) and a second ['] to insert at relative position 3 (the
       length of [sub], so [D]); its full encoding is then
-      [u 14 E 27 D 27 _ funcsub].
- *)
+      [u 14 E 27 D 27 _ funcsub]. *)
+
+(** State for the encoding state machine: [Raw] = processing output characters,
+   [Esc] = processing escaped (non-output) characters. *)
 type encode_state =
   | Raw
   | Esc
@@ -216,6 +218,8 @@ let path_from_comp_unit (cu : Compilation_unit.t) : path =
   |> List.map (fun x -> Compilation_unit x)
 
 let mangle_ident (cu : Compilation_unit.t) (path : path) =
+  (* Remove the common prefix between the compilation unit path and the
+     identifier path to avoid redundant repetition in the mangled name. *)
   let rec deduplicate full_path cu_path path =
     match cu_path, path with
     | [], _ -> path
