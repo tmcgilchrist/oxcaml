@@ -104,7 +104,6 @@ val of_items : item list -> t
 val mapi_items : t -> f:(int -> item -> item) -> t
 
 val to_items : t -> item list
-(* See Note [Debuginfo items] *)
 
 val to_string : t -> string
 
@@ -126,10 +125,9 @@ val merge : into:t -> t -> t
 val assume_zero_alloc : t -> ZA.Assume_info.t
 
 (** [to_structured_mangling_path] converts the debug info into a mangling path.
-    If the debug info is empty, the fallback name is used to populate the path.
+    In all cases, the [name] is used to populate the last element of the path.
 *)
 val to_structured_mangling_path : name:string -> t -> Structured_mangling.path
-
 
 module Dbg : sig
   type t
@@ -151,4 +149,3 @@ module Dbg : sig
 end
 
 val get_dbg : t -> Dbg.t
-

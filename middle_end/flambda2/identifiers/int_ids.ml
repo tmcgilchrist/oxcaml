@@ -847,7 +847,6 @@ module Code_id = struct
           then Printf.sprintf "_%d" name_stamp
           else Printf.sprintf "_%d_code" name_stamp
         in
-        (* CR sspies: Note that the name still contains the additional stamp. *)
         let path = Debuginfo.to_structured_mangling_path ~name debug in
         Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
         |> Symbol0.linkage_name

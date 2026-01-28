@@ -128,7 +128,7 @@ module Scoped_location = struct
       | _ -> dot scopes s
     in
     cons scopes Sc_method_definition str s
-      ~assume_zero_alloc:ZA.Assume_info.none (Some (Function str))
+      ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
 
   let enter_lazy ~scopes = cons scopes Sc_lazy (str scopes) ""
                              ~assume_zero_alloc:ZA.Assume_info.none None
@@ -454,31 +454,27 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
 let to_structured_mangling_path ~name dbg : Structured_mangling.path =
-  (* Ensure the path finishes with the [name], dropping the last item
-     if it's a (anonymous or not) function and the whole prefix of partial
-     functions, as:
-     - it should be redundant with the [name] (otherwise some debug
-       information is missing),
-     - it makes it more uniform across cases when we have access to a full name
-       in the path and cases when we do not *)
-  let rec drop_partials = function
-    | Structured_mangling.Partial_function _ :: path -> drop_partials path
+  (* We ensure the path ends with [name] to preserve all stamps that the name
+     includes. To do so, we drop the suffix of partial applications if there is
+     any and, additionally, the last function or anonymous function if there is
+     any. It should effectively be the same function as [name]. *)
+  let rec drop_partials_and_last_function (path : Structured_mangling.path) =
+    match path with
+    | Partial_function _ :: path -> drop_partials_and_last_function path
+    | Function _ :: path -> path
+    | Anonymous_function _ :: path -> path
     | path -> path
   in
-  let force_last_name path =
-    let open Structured_mangling in
-    match List.rev path with
-    | Partial_function _ :: rpath ->
-      List.rev (Function name :: drop_partials rpath)
-    | Function _ :: rpath | Anonymous_function _ :: rpath | rpath ->
-      List.rev (Function name :: rpath)
-  in
-  force_last_name
-    (match to_items dbg with
+  let path_from_debug =
+    match to_items dbg with
     | [] -> []
     | item :: _ ->
       (* The list of debuginfo items can contain more than one item in case of
-         inlining. The first item is the location it was inlined into, the last
-         item is the location it was inlined from. See PR #5099 for a longer
-         discussion. *)
-      path_of_debug_info_scopes [] item.dinfo_scopes)
+         inlining (see [merge]). For the moment, we use the first item. In the
+         future, it would be good to track the original source of the
+         function. *)
+      path_of_debug_info_scopes [] item.dinfo_scopes
+  in
+  Structured_mangling.Function name
+  :: drop_partials_and_last_function (List.rev path_from_debug)
+  |> List.rev

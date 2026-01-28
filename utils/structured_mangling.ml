@@ -205,8 +205,8 @@ let mangle_path_item buf path_item =
   in
   match path_item with
   | Compilation_unit cu ->
-    (* CR sspies: Use the Flat mangling scheme for parameterised libraries (and
-       [-for-pack] prefixes, with the [__] separator) for now, a Structured
+    (* CR sspies: Use the Flat mangling scheme for parameterized libraries (and
+       [-for-pack] prefixes, with the [__] separator) for now. A Structured
        version is postponed to a future PR. *)
     let pack_separator () = "__" in
     let sym = Compilation_unit.mangle_for_linkage_name ~pack_separator cu in
@@ -222,8 +222,7 @@ let mangle_path_item buf path_item =
   | Partial_function (line, col, file_opt) ->
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
 
-let mangle_path buf path =
-  List.iter (fun pi -> Printf.bprintf buf "%a" mangle_path_item pi) path
+let mangle_path buf path = List.iter (mangle_path_item buf) path
 
 let mangle_ident (cu : Compilation_unit.t) (path : path) =
   (* Compare the current compilation unit with the one recorded in the [path] to
