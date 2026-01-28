@@ -472,7 +472,7 @@ let to_structured_mangling_path ~name dbg : Structured_mangling.path =
       (* The list of debuginfo items can contain more than one item in case of
          inlining (see [merge]). For the moment, we use the first item. In the
          future, it would be good to track the original source of the
-         function. *)
+         function. See #5099. *)
       path_of_debug_info_scopes [] item.dinfo_scopes
   in
   Structured_mangling.Function name
