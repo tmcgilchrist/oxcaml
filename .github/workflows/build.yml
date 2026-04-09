@@ -138,6 +138,13 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
+          - name: irc frame-pointers (aarch64-macos)
+            config: --enable-frame-pointers --disable-warn-error
+            os: macos-latest
+            build_ocamlparam: '_,w=-46,regalloc=irc'
+            ocamlparam: '_,w=-46,regalloc=irc'
+            check_arch: true
+
           - name: runtime5 cfg-invariants (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
