@@ -1,0 +1,17 @@
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF9f_start_XXX_XXX_code(param=0 : ocaml_value)
+=== Testing simple top-level backtrace ===
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF20f_simple_backtrace_XXX_XXX_code(message="hello world" : string @ value, x=42 : int @ value)
+Backtrace for simple function:
+  * frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF20f_simple_backtrace_XXX_XXX_code(message="hello world" : string @ value, x=42 : int @ value)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.entry
+=== Testing recursive countdown with leaf function ===
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU6StdlibFu6A5e__XXX_XXX_code at stdlib.ml:225:37 [inlined]
+Backtrace at leaf function (depth 4 countdown):
+  * frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU6StdlibFu6A5e__XXX_XXX_code at stdlib.ml:225:37 [inlined]
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF8f_leaf_XXX_XXX_code(info={ name = "start>>>>"; value = 0; timestamp = 3.14159 } : debug_info @ value, extra="final" : string @ value)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF13f_countdown_XXX_XXX_code(n=<unavailable>, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF13f_countdown_XXX_XXX_code(n=1 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF13f_countdown_XXX_XXX_code(n=2 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF13f_countdown_XXX_XXX_code(n=3 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`__CamlU20Test_callstack_dwarfF13f_countdown_XXX_XXX_code(n=4 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.entry

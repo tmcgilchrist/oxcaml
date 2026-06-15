@@ -1,19 +1,28 @@
+(rule
+ (enabled_if (<> %{system} "macosx"))
+ (action
+  (with-stdout-to function_sections_flags.sexp (echo "(-function-sections)"))))
+
+(rule
+ (enabled_if (= %{system} "macosx"))
+ (action (with-stdout-to function_sections_flags.sexp (echo "()"))))
+
 
 (executable
  (name test_basic_dwarf)
  (modules test_basic_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_basic_dwarf.output.corrected)
  (deps test_basic_dwarf.exe test_basic_dwarf.lldb filter_for_function_call_only.sh)
@@ -30,7 +39,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_basic_dwarf.output.corrected)
  (deps test_basic_dwarf.exe)
@@ -45,26 +54,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_basic_dwarf.output test_basic_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_basic_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_basic_dwarf.output.corrected)
  (action
-  (diff test_basic_dwarf.output test_basic_dwarf.output.corrected)))
+  (diff test_basic_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_basic_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_basic_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_basic_dwarf.output.corrected)
+ (action
+  (diff test_basic_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_basic_dwarf.output.corrected)))
 
 (executable
  (name test_unboxed_dwarf)
  (modules test_unboxed_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_unboxed_dwarf.output.corrected)
  (deps test_unboxed_dwarf.exe test_unboxed_dwarf.lldb filter_for_function_call_only.sh)
@@ -81,7 +97,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_unboxed_dwarf.output.corrected)
  (deps test_unboxed_dwarf.exe)
@@ -96,26 +112,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_unboxed_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_unboxed_dwarf.output.corrected)
  (action
-  (diff test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)))
+  (diff test_unboxed_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_unboxed_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_unboxed_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_unboxed_dwarf.output.corrected)
+ (action
+  (diff test_unboxed_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_unboxed_dwarf.output.corrected)))
 
 (executable
  (name test_datatypes_dwarf)
  (modules test_datatypes_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_datatypes_dwarf.output.corrected)
  (deps test_datatypes_dwarf.exe test_datatypes_dwarf.lldb filter_for_function_call_only.sh)
@@ -132,7 +155,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_datatypes_dwarf.output.corrected)
  (deps test_datatypes_dwarf.exe)
@@ -147,26 +170,34 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_datatypes_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_datatypes_dwarf.output.corrected)
  (action
-  (diff test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)))
+  (diff test_datatypes_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_datatypes_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_datatypes_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_datatypes_dwarf.output.corrected)
+ (action
+  (diff test_datatypes_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_datatypes_dwarf.output.corrected)))
 
 (executable
  (name test_simd_dwarf)
  (modules test_simd_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp)))
  (foreign_archives simd_stubs))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_simd_dwarf.output.corrected)
  (deps test_simd_dwarf.exe test_simd_dwarf.lldb filter_for_function_call_only.sh)
@@ -183,7 +214,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_simd_dwarf.output.corrected)
  (deps test_simd_dwarf.exe)
@@ -198,26 +229,26 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_simd_dwarf.output test_simd_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_simd_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_simd_dwarf.output.corrected)
  (action
-  (diff test_simd_dwarf.output test_simd_dwarf.output.corrected)))
+  (diff test_simd_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_simd_dwarf.output.corrected)))
 
 (executable
  (name test_simple_functor_dwarf)
  (modules test_simple_functor_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_simple_functor_dwarf.output.corrected)
  (deps test_simple_functor_dwarf.exe test_simple_functor_dwarf.lldb filter_for_function_call_only.sh)
@@ -234,7 +265,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_simple_functor_dwarf.output.corrected)
  (deps test_simple_functor_dwarf.exe)
@@ -249,26 +280,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_simple_functor_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_simple_functor_dwarf.output.corrected)
  (action
-  (diff test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)))
+  (diff test_simple_functor_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_simple_functor_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_simple_functor_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_simple_functor_dwarf.output.corrected)
+ (action
+  (diff test_simple_functor_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_simple_functor_dwarf.output.corrected)))
 
 (executable
  (name test_parameters_dwarf)
  (modules test_parameters_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_parameters_dwarf.output.corrected)
  (deps test_parameters_dwarf.exe test_parameters_dwarf.lldb filter_for_function_call_only.sh)
@@ -285,7 +323,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_parameters_dwarf.output.corrected)
  (deps test_parameters_dwarf.exe)
@@ -300,26 +338,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_parameters_dwarf.output test_parameters_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_parameters_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_parameters_dwarf.output.corrected)
  (action
-  (diff test_parameters_dwarf.output test_parameters_dwarf.output.corrected)))
+  (diff test_parameters_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_parameters_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_parameters_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_parameters_dwarf.output.corrected)
+ (action
+  (diff test_parameters_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_parameters_dwarf.output.corrected)))
 
 (executable
  (name test_callstack_dwarf)
  (modules test_callstack_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_callstack_dwarf.output.corrected)
  (deps test_callstack_dwarf.exe test_callstack_dwarf.lldb filter_for_function_call_only.sh)
@@ -336,7 +381,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_callstack_dwarf.output.corrected)
  (deps test_callstack_dwarf.exe)
@@ -351,26 +396,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_callstack_dwarf.output test_callstack_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_callstack_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_callstack_dwarf.output.corrected)
  (action
-  (diff test_callstack_dwarf.output test_callstack_dwarf.output.corrected)))
+  (diff test_callstack_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_callstack_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_callstack_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_callstack_dwarf.output.corrected)
+ (action
+  (diff test_callstack_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_callstack_dwarf.output.corrected)))
 
 (executable
  (name test_stepping_dwarf)
  (modules test_stepping_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_stepping_dwarf.output.corrected)
  (deps test_stepping_dwarf.exe test_stepping_dwarf.lldb filter_for_function_call_only.sh)
@@ -387,7 +439,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_stepping_dwarf.output.corrected)
  (deps test_stepping_dwarf.exe)
@@ -402,26 +454,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_stepping_dwarf.output test_stepping_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_stepping_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_stepping_dwarf.output.corrected)
  (action
-  (diff test_stepping_dwarf.output test_stepping_dwarf.output.corrected)))
+  (diff test_stepping_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_stepping_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_stepping_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_stepping_dwarf.output.corrected)
+ (action
+  (diff test_stepping_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_stepping_dwarf.output.corrected)))
 
 (executable
  (name test_closures_dwarf)
  (modules test_closures_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_closures_dwarf.output.corrected)
  (deps test_closures_dwarf.exe test_closures_dwarf.lldb filter_for_function_call_only.sh)
@@ -438,7 +497,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_closures_dwarf.output.corrected)
  (deps test_closures_dwarf.exe)
@@ -453,26 +512,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_closures_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_closures_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)
  (action
-  (diff test_closures_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)))
+  (diff test_closures_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_closures_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)
+ (action
+  (diff test_closures_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)))
 
 (executable
  (name test_large_data_dwarf)
  (modules test_large_data_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_large_data_dwarf.output.corrected)
  (deps test_large_data_dwarf.exe test_large_data_dwarf.lldb filter_for_function_call_only.sh)
@@ -489,7 +555,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_large_data_dwarf.output.corrected)
  (deps test_large_data_dwarf.exe)
@@ -504,26 +570,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_large_data_dwarf.output test_large_data_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_large_data_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_large_data_dwarf.output.corrected)
  (action
-  (diff test_large_data_dwarf.output test_large_data_dwarf.output.corrected)))
+  (diff test_large_data_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_large_data_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_large_data_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_large_data_dwarf.output.corrected)
+ (action
+  (diff test_large_data_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_large_data_dwarf.output.corrected)))
 
 (executable
  (name test_tailrec_dwarf)
  (modules test_tailrec_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_tailrec_dwarf.output.corrected)
  (deps test_tailrec_dwarf.exe test_tailrec_dwarf.lldb filter_for_function_call_only.sh)
@@ -540,7 +613,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_tailrec_dwarf.output.corrected)
  (deps test_tailrec_dwarf.exe)
@@ -555,26 +628,33 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_tailrec_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_tailrec_dwarf.output.corrected)
  (action
-  (diff test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)))
+  (diff test_tailrec_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_tailrec_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_tailrec_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_tailrec_dwarf.output.corrected)
+ (action
+  (diff test_tailrec_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_tailrec_dwarf.output.corrected)))
 
 (executable
  (name test_ocaml_and_c_dwarf)
  (modules test_ocaml_and_c_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (and (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))))
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
- (foreign_archives simd_stubs))
+   -name-mangling-scheme %{env:OXCAML_NAME_MANGLING=flat}
+   (:include function_sections_flags.sexp))))
 
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_ocaml_and_c_dwarf.output.corrected)
  (deps test_ocaml_and_c_dwarf.exe test_ocaml_and_c_dwarf.lldb filter_for_function_call_only.sh)
@@ -591,7 +671,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (= %{context_name} "main") (or (and (= %{architecture} "amd64") (<> %{system} "macosx")) (and (= %{architecture} "arm64") (= %{system} "macosx")))
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_ocaml_and_c_dwarf.output.corrected)
  (deps test_ocaml_and_c_dwarf.exe)
@@ -606,7 +686,14 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 
 (rule
  (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
- (deps test_ocaml_and_c_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (<> %{system} "macosx"))))
+ (deps test_ocaml_and_c_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)
  (action
-  (diff test_ocaml_and_c_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)))
+  (diff test_ocaml_and_c_dwarf.linux.amd64.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "arm64") (= %{system} "macosx"))))
+ (deps test_ocaml_and_c_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)
+ (action
+  (diff test_ocaml_and_c_dwarf.macos.arm64.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)))

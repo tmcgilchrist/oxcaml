@@ -22,8 +22,8 @@ sed \
   -e 's| at [a-zA-Z0-9_/.-]*\.h:[0-9]*:[0-9]*$||g' \
   -e 's|caml_start_program + [0-9]*|caml_start_program|g' \
   -e 's|caml_c_call + [0-9]*|caml_c_call + N|g' \
-  -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_[0-9]\+_code|\1_XXX_XXX_code|g' \
-  -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_unboxed|\1_XXX_unboxed|g' | \
+  -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9][0-9]*_[0-9][0-9]*_code|\1_XXX_XXX_code|g' \
+  -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9][0-9]*_unboxed|\1_XXX_unboxed|g' | \
 # Second sed: Conceal unstable pointer values in C runtime function parameters
 sed \
   -e '/caml_blit_bytes/s|s1=#[0-9]\{10,\}L|s1=<PTR>|g' \
@@ -36,16 +36,33 @@ sed \
   -e '/caml_input_value_from_bytes/s|str=#[0-9]\{10,\}L|str=<PTR>|g' \
   -e '/caml_md5_string/s|str=#[0-9]\{5,\}L|str=<PTR>|g' \
   -e '/caml_sys_getenv/s|var=#[0-9]\{5,\}L|var=<PTR>|g' \
-  -e '/caml_ba_create/s|vdim=#[0-9]\{5,\}L|vdim=<PTR>|g' | \
+  -e '/caml_ba_create/s|vdim=#[0-9]\{5,\}L|vdim=<PTR>|g' \
+  `# macOS/LLDB renders C pointer args as bare decimals or 0x hex, not #NNNNL` \
+  -e '/caml_blit_bytes/s|s1=[0-9]\{5,\}|s1=<PTR>|g' \
+  -e '/caml_blit_bytes/s|s2=[0-9]\{5,\}|s2=<PTR>|g' \
+  -e '/caml_hash_exn/s|obj=[0-9]\{5,\}|obj=<PTR>|g' \
+  -e '/caml_compare/s|v1=[0-9]\{5,\}|v1=<PTR>|g' \
+  -e '/caml_compare/s|v2=[0-9]\{5,\}|v2=<PTR>|g' \
+  -e '/caml_output_value_to_buffer/s|buf=[0-9]\{5,\}|buf=<PTR>|g' \
+  -e '/caml_output_value_to_buffer/s|v=[0-9]\{5,\}|v=<PTR>|g' \
+  -e '/caml_input_value_from_bytes/s|str=[0-9]\{5,\}|str=<PTR>|g' \
+  -e '/caml_md5_string/s|str=[0-9]\{5,\}|str=<PTR>|g' \
+  -e '/sys_getenv/s|var=[0-9]\{5,\}|var=<PTR>|g' \
+  -e '/caml_ba_create/s|vdim=[0-9]\{5,\}|vdim=<PTR>|g' \
+  -e '/caml_MD5Init/s|ctx=0x[0-9a-f]*|ctx=<PTR>|g' \
+  -e '/Hd_val/s|val=[0-9]\{5,\}|val=<PTR>|g' \
+  -e '/callback/s|closure=[0-9]\{5,\}|closure=<PTR>|g' \
+  -e '/callback/s|arg=[0-9]\{5,\}|arg=<PTR>|g' | \
 # grep: Remove LLDB noise
 grep -v \
   -e '^(lldb) ' \
   -e '^Process <PID> resuming$' \
   -e '^Process <PID> stopped$' \
   -e '^Process <PID> launched:' \
-  -e '^\* thread #[0-9]*, name = ' \
+  -e '^\* thread #[0-9]*,' \
   -e '^Breakpoint [0-9]*:' \
   -e '^Current executable set to' \
   -e '^Executing commands in' \
+  -e 'debug map object file' \
   -e '^$' | \
 tr -d '\r'
