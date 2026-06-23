@@ -510,19 +510,58 @@ let to_structured_mangling_path ~name dbg :
       rev_keep_compilation_units (a :: acc) path
     | pi :: path -> rev_drop_scopes_above_anonymous (pi :: acc) path
   in
-  let path_from_debug =
-    match to_items dbg with
-    | [] -> []
-    | item :: _ ->
-      (* CR sspies: The list of debuginfo items can contain more than one item
-         in case of inlining (see [merge]). For the moment, we use the first
-         item. In the future, it would be good to track the original source of
-         the function. See #5099. *)
-      path_of_debug_info_scopes [] item.dinfo_scopes
+  (* Build the path describing the function body itself, from a single
+     debuginfo item's scopes. *)
+  let body_path scopes =
+    match
+      drop_partials_and_last_function
+        (List.rev (path_of_debug_info_scopes [] scopes))
+    with
+    | `Anonymous (a, path_above) -> rev_keep_compilation_units [a] path_above
+    | `Named path_above ->
+      rev_drop_scopes_above_anonymous
+        [Structured_mangling.Function name]
+        path_above
   in
-  match drop_partials_and_last_function (List.rev path_from_debug) with
-  | `Anonymous (a, path_above) -> rev_keep_compilation_units [a] path_above
-  | `Named path_above ->
-    rev_drop_scopes_above_anonymous
-      [Structured_mangling.Function name]
-      path_above
+  (* The list of debuginfo items holds the inlining/specialisation frames, from
+     the outermost call site down to the function body (the last item). The body
+     carries [name] and its stamps; the earlier frames are the call sites that
+     produced this (specialised) copy. We prefix the body path with each
+     call-site context, separated by an [Inline_marker] (rendered as
+     [<specialization_of>]), so that, e.g., two functor instances are told apart
+     by the module they were specialised into. With a single frame (no
+     specialisation) this is exactly the body path. *)
+  (* Across an [Inline_marker], drop a compilation unit that merely repeats the
+     one already in effect (a same-unit specialisation such as a functor
+     instance); keep it when it genuinely switches unit (cross-module
+     inlining). *)
+  let drop_repeated_units path =
+    let rec aux ~cur_unit ~after_marker acc
+        (path : Compilation_unit.t Structured_mangling.path) =
+      match path with
+      | [] -> List.rev acc
+      | (Compilation_unit cu as pi) :: path ->
+        if after_marker
+           &&
+           match cur_unit with
+           | Some u -> Compilation_unit.equal u cu
+           | None -> false
+        then aux ~cur_unit ~after_marker:false acc path
+        else aux ~cur_unit:(Some cu) ~after_marker:false (pi :: acc) path
+      | (Inline_marker as pi) :: path ->
+        aux ~cur_unit ~after_marker:true (pi :: acc) path
+      | pi :: path -> aux ~cur_unit ~after_marker:false (pi :: acc) path
+    in
+    aux ~cur_unit:None ~after_marker:false [] path
+  in
+  match List.rev (to_items dbg) with
+  | [] -> [Structured_mangling.Function name]
+  | body_item :: callsite_items_rev ->
+    let callsite_context =
+      List.rev callsite_items_rev
+      |> List.map (fun item ->
+             path_of_debug_info_scopes [] item.dinfo_scopes
+             @ [Structured_mangling.Inline_marker])
+      |> List.concat
+    in
+    drop_repeated_units (callsite_context @ body_path body_item.dinfo_scopes)

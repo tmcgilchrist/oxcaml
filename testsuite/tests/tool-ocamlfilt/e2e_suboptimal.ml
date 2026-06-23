@@ -21,35 +21,6 @@
    STRUCTURED column of [e2e_suboptimal.reference] for the demangled
    names. *)
 
-(* {1 Functor instances are indistinguishable; the body name doubles}
-
-   The two applications below produce separate compiled copies of [run]
-   (alongside the functor's own template), but they all mangle identically
-   to [Make.run]: the application site ([Int_inst] / [Str_inst]) never
-   appears in the name, so the copies cannot be told apart. The functor's
-   own body symbol also doubles its name, mangling to [Make.Make]. *)
-module type ORD = sig
-  type t
-
-  val cmp : t -> t -> int
-end
-
-module Make (O : ORD) = struct
-  let[@inline never] run a b = O.cmp a b + O.cmp b a
-end
-
-module Int_inst = Make (struct
-  type t = int
-
-  let cmp = compare
-end)
-
-module Str_inst = Make (struct
-  type t = string
-
-  let cmp = compare
-end)
-
 (* {1 Classes and objects get poor symbols across the board}
 
    OxCaml emits no DWARF for the OOP fragment of OCaml and the linker
@@ -92,8 +63,6 @@ let make_logger () = object
 end
 
 let () =
-  ignore (Int_inst.run 1 2);
-  ignore (Str_inst.run "a" "b");
   ignore (scale 1);
   let d = new dog "rex" in
   ignore d#sound;
