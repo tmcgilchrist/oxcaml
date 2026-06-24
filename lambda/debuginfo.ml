@@ -471,14 +471,22 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg :
+let to_structured_mangling_path ~name ~is_a_functor dbg :
     Compilation_unit.t Structured_mangling.path =
   (* We drop the suffix of partial applications and the innermost named
      function: that function should effectively be [name], and seeding the path
      with [name] preserves all the stamps that [name] includes. An innermost
      anonymous function is instead kept as is ([`Anonymous]): its position
      information precisely identifies it and would be lost if it were replaced
-     by the locationless [name]. *)
+     by the locationless [name].
+
+     A functor body is named after its own binding, which already appears as
+     the enclosing [Module] scope, so seeding it with [name] would repeat that
+     name ([Make.Make]). We instead seed it with the [Functor] marker, yielding
+     [Make.<functor>]. *)
+  let leaf : Compilation_unit.t Structured_mangling.path_item =
+    if is_a_functor then Functor else Function name
+  in
   let rec drop_partials_and_last_function
       (path : Compilation_unit.t Structured_mangling.path) =
     match path with
@@ -518,10 +526,7 @@ let to_structured_mangling_path ~name dbg :
         (List.rev (path_of_debug_info_scopes [] scopes))
     with
     | `Anonymous (a, path_above) -> rev_keep_compilation_units [a] path_above
-    | `Named path_above ->
-      rev_drop_scopes_above_anonymous
-        [Structured_mangling.Function name]
-        path_above
+    | `Named path_above -> rev_drop_scopes_above_anonymous [leaf] path_above
   in
   (* The list of debuginfo items holds the inlining/specialisation frames, from
      the outermost call site down to the function body (the last item). The body
@@ -555,7 +560,7 @@ let to_structured_mangling_path ~name dbg :
     aux ~cur_unit:None ~after_marker:false [] path
   in
   match List.rev (to_items dbg) with
-  | [] -> [Structured_mangling.Function name]
+  | [] -> [leaf]
   | body_item :: callsite_items_rev ->
     let callsite_context =
       List.rev callsite_items_rev
