@@ -244,6 +244,8 @@ module Attribute : sig
       | Linker_dirs : Class.string t
       | Cmt_file_digest : Class.string t
       | Offset_record_from_pointer : Class.constant t
+      | Method_hash : Class.constant t
+      | Open_row : Class.flag t
   end
 
   type 'dwarf_classes t =

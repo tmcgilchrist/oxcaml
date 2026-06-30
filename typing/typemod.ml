@@ -4016,65 +4016,89 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         in
         let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
         Value.submode_err (first_loc, Class) Types.class_mode mode;
-        let shape_map = List.fold_left (fun acc cls ->
+        (* Under [Debugging_shapes], decompose each class into a structured
+           object shape (methods, instance variables, inherited parents) so the
+           debugger sees its contents. Merlin's [Old_merlin] format keeps the
+           class as an opaque leaf. *)
+        let class_shapes =
+          List.map
+            (fun (cls : Typedtree.class_declaration Typeclass.class_info) ->
+              let open Typeclass in
+              let uid = cls.cls_decl.cty_uid in
+              let obj_shape =
+                match !Clflags.shape_format with
+                | Clflags.Old_merlin -> Shape.leaf uid
+                | Clflags.Debugging_shapes ->
+                  let rec parent_uid (ce : Typedtree.class_expr) =
+                    match ce.cl_desc with
+                    | Tcl_ident (path, _, _) -> (
+                      match Env.find_class path env with
+                      | cd -> Some cd.cty_uid
+                      | exception Not_found -> None)
+                    | Tcl_apply (ce, _)
+                    | Tcl_fun (_, _, _, ce, _)
+                    | Tcl_let (_, _, _, ce)
+                    | Tcl_constraint (ce, _, _, _, _)
+                    | Tcl_open (_, ce) ->
+                      parent_uid ce
+                    | Tcl_structure _ -> None
+                  in
+                  let rec inherited_fields (ce : Typedtree.class_expr) =
+                    match ce.cl_desc with
+                    | Tcl_structure str -> str.cstr_fields
+                    | Tcl_apply (ce, _)
+                    | Tcl_fun (_, _, _, ce, _)
+                    | Tcl_let (_, _, _, ce)
+                    | Tcl_constraint (ce, _, _, _, _)
+                    | Tcl_open (_, ce) ->
+                      inherited_fields ce
+                    | Tcl_ident _ -> []
+                  in
+                  let parents =
+                    List.filter_map
+                      (fun (cf : Typedtree.class_field) ->
+                        match cf.cf_desc with
+                        | Tcf_inherit (_, parent, _, _, _) ->
+                          Option.map Shape.leaf (parent_uid parent)
+                        | Tcf_val _ | Tcf_method _ | Tcf_constraint _
+                        | Tcf_initializer _ | Tcf_attribute _ ->
+                          None)
+                      (inherited_fields cls.cls_info.ci_expr)
+                  in
+                  Type_shape.Type_decl_shape.of_class_declaration cls.cls_decl
+                    ~parents (Env.shape_for_constr env)
+              in
+              cls, obj_shape)
+            classes
+        in
+        let shape_map = List.fold_left (fun acc (cls, obj_shape) ->
             let open Typeclass in
             let loc = cls.cls_id_loc.Location.loc in
             Signature_names.check_class names loc cls.cls_id;
             Signature_names.check_class_type names loc cls.cls_ty_id;
             Signature_names.check_type names loc cls.cls_obj_id;
             let uid = cls.cls_decl.cty_uid in
-            (* Under [Debugging_shapes], decompose the class into a structured
-               object shape (methods, instance variables, inherited parents) so
-               the debugger sees its contents. Merlin's [Old_merlin] format
-               keeps the class as an opaque leaf. *)
-            let obj_shape =
-              match !Clflags.shape_format with
-              | Clflags.Old_merlin -> Shape.leaf uid
-              | Clflags.Debugging_shapes ->
-                let rec parent_uid (ce : Typedtree.class_expr) =
-                  match ce.cl_desc with
-                  | Tcl_ident (path, _, _) -> (
-                    match Env.find_class path env with
-                    | cd -> Some cd.cty_uid
-                    | exception Not_found -> None)
-                  | Tcl_apply (ce, _)
-                  | Tcl_fun (_, _, _, ce, _)
-                  | Tcl_let (_, _, _, ce)
-                  | Tcl_constraint (ce, _, _, _, _)
-                  | Tcl_open (_, ce) ->
-                    parent_uid ce
-                  | Tcl_structure _ -> None
-                in
-                let rec inherited_fields (ce : Typedtree.class_expr) =
-                  match ce.cl_desc with
-                  | Tcl_structure str -> str.cstr_fields
-                  | Tcl_apply (ce, _)
-                  | Tcl_fun (_, _, _, ce, _)
-                  | Tcl_let (_, _, _, ce)
-                  | Tcl_constraint (ce, _, _, _, _)
-                  | Tcl_open (_, ce) ->
-                    inherited_fields ce
-                  | Tcl_ident _ -> []
-                in
-                let parents =
-                  List.filter_map
-                    (fun (cf : Typedtree.class_field) ->
-                      match cf.cf_desc with
-                      | Tcf_inherit (_, parent, _, _, _) ->
-                        Option.map Shape.leaf (parent_uid parent)
-                      | Tcf_val _ | Tcf_method _ | Tcf_constraint _
-                      | Tcf_initializer _ | Tcf_attribute _ ->
-                        None)
-                    (inherited_fields cls.cls_info.ci_expr)
-                in
-                Type_shape.Type_decl_shape.of_class_declaration cls.cls_decl
-                  ~parents (Env.shape_for_constr env)
-            in
             let map f id v acc = f acc id v in
             map Shape.Map.add_class cls.cls_id uid acc
             |> map Shape.Map.add_class_type cls.cls_ty_id uid
             |> map Shape.Map.add_type cls.cls_obj_id obj_shape
-          ) shape_map classes
+          ) shape_map class_shapes
+        in
+        (* Attach the structured object shape to the object-type binding in the
+           environment, so that same-unit values of the object type resolve to
+           it during DWARF emission (records attach their shape the same way;
+           cross-unit resolution goes through the module shape instead). *)
+        let new_env =
+          match !Clflags.shape_format with
+          | Clflags.Old_merlin -> new_env
+          | Clflags.Debugging_shapes ->
+            List.fold_left
+              (fun env
+                   ( (cls : Typedtree.class_declaration Typeclass.class_info),
+                     shape ) ->
+                Env.add_type ~check:false ~shape cls.Typeclass.cls_obj_id
+                  cls.Typeclass.cls_obj_abbr env)
+              new_env class_shapes
         in
         Tstr_class
           (List.map (fun cls ->

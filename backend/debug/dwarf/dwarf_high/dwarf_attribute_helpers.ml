@@ -432,3 +432,11 @@ let create_ocaml_cmt_file_digest digest =
 let create_ocaml_offset_record_from_pointer ~value =
   let spec = AS.create (Ocaml_specific Offset_record_from_pointer) Data8 in
   AV.create spec (V.int64 value)
+
+let create_ocaml_method_hash ~hash =
+  let spec = AS.create (Ocaml_specific Method_hash) Data8 in
+  AV.create spec (V.int64 ~comment:"OCaml method hash" (Int64.of_int hash))
+
+let create_ocaml_open_row () =
+  let spec = AS.create (Ocaml_specific Open_row) Flag_present in
+  AV.create spec (V.flag_true ~comment:"OCaml open row" ())

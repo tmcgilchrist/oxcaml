@@ -356,6 +356,8 @@ module Attribute = struct
       | Linker_dirs : Class.string t
       | Cmt_file_digest : Class.string t
       | Offset_record_from_pointer : Class.constant t
+      | Method_hash : Class.constant t
+      | Open_row : Class.flag t
   end
 
   type 'dwarf_classes t =
@@ -637,6 +639,8 @@ module Attribute = struct
       | Ocaml_specific Cmt_file_digest -> "Ocaml_cmt_file_digest"
       | Ocaml_specific Offset_record_from_pointer ->
         "offset_record_from_pointer"
+      | Ocaml_specific Method_hash -> "Ocaml_method_hash"
+      | Ocaml_specific Open_row -> "Ocaml_open_row"
     in
     "DW_AT_" ^ name
 
@@ -789,6 +793,8 @@ module Attribute = struct
     | Ocaml_specific Linker_dirs -> 0x3104
     | Ocaml_specific Cmt_file_digest -> 0x3105
     | Ocaml_specific Offset_record_from_pointer -> 0x3106
+    | Ocaml_specific Method_hash -> 0x3107
+    | Ocaml_specific Open_row -> 0x3108
 
   let encode t =
     Dwarf_value.uleb128 ~comment:(name t)

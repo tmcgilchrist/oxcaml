@@ -217,3 +217,8 @@ val create_ocaml_cmt_file_digest :
 
 val create_ocaml_offset_record_from_pointer :
   value:Int64.t -> Dwarf_attribute_values.Attribute_value.t
+
+val create_ocaml_method_hash :
+  hash:int -> Dwarf_attribute_values.Attribute_value.t
+
+val create_ocaml_open_row : unit -> Dwarf_attribute_values.Attribute_value.t

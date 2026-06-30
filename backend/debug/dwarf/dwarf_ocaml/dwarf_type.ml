@@ -379,6 +379,67 @@ let create_record_die ~reference ~parent_proto_die ?name ~fields () =
     fields;
   wrap_die_under_a_pointer ~proto_die:structure ~reference ~parent_proto_die
 
+(* Emit a [DW_TAG_class_type] for an OCaml object/class. Members (instance
+   variables) are marked [DW_AT_declaration] with no [data_member_location]: the
+   slot layout is assigned at runtime by [CamlinternalOO], so we never assert an
+   offset (filling those in is a later phase). Methods become
+   [DW_TAG_subprogram] declarations carrying a [DW_AT_OCAML_method_hash] in
+   place of a vtable slot (OCaml dispatches public methods by a runtime hash
+   search, not a fixed index), plus an artificial [self] receiver typed as the
+   enclosing object (the analogue of C++'s [this]). [ivars] and [methods] carry
+   already-built child type DIE references. *)
+let create_class_type_die ~reference ~parent_proto_die ?name ~ivars ~methods
+    ~open_row () =
+  let cls =
+    Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Class_type
+      ~attribute_values:
+        ((if open_row then [DAH.create_ocaml_open_row ()] else [])
+        |> attribute_list_with_optional_name name)
+      ()
+  in
+  List.iter
+    (fun (ivar_name, ivar_die) ->
+      let member =
+        Proto_die.create ~parent:(Some cls) ~tag:Dwarf_tag.Member
+          ~attribute_values:
+            [ DAH.create_name ivar_name;
+              DAH.create_type_from_reference ~proto_die_reference:ivar_die;
+              DAH.create_declaration () ]
+          ()
+      in
+      Debugging_the_compiler.add
+        ~reference:(Proto_die.reference member)
+        ("." ^ ivar_name))
+    ivars;
+  List.iter
+    (fun (method_name, is_public, method_hash, method_type_die) ->
+      let subprogram =
+        Proto_die.create ~parent:(Some cls) ~tag:Dwarf_tag.Subprogram
+          ~attribute_values:
+            ([ DAH.create_name method_name;
+               DAH.create_ocaml_method_hash ~hash:method_hash;
+               DAH.create_declaration () ]
+            @ (if is_public
+               then [DAH.create_external ~is_visible_externally:true]
+               else [])
+            @
+            match method_type_die with
+            | Some die ->
+              [DAH.create_type_from_reference ~proto_die_reference:die]
+            | None -> [])
+          ()
+      in
+      (* The implicit self receiver, typed as the enclosing object (the boxed
+         pointer bound at [reference] by [wrap_die_under_a_pointer] below). *)
+      Proto_die.create_ignore ~parent:(Some subprogram)
+        ~tag:Dwarf_tag.Formal_parameter
+        ~attribute_values:
+          [ DAH.create_type_from_reference ~proto_die_reference:reference;
+            DAH.create_artificial () ]
+        ())
+    methods;
+  wrap_die_under_a_pointer ~proto_die:cls ~reference ~parent_proto_die
+
 (* The following function handles records annotated with [[@@unboxed]]. These
    may only have a single field. ("Unboxed records" of the form [#{ ... }] are
    destructed into their component parts by unarization.) *)
@@ -1420,13 +1481,37 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
        be enough. *)
     let reference' = die_with_extended_env sh reference in
     create_typedef_die ~reference ~parent_proto_die ?name reference'
-  | Object _ ->
-    (* TODO The structured object shape reaches the backend but
-       is not yet emitted as a [DW_TAG_class_type] with members and methods.
-       Emit a plain value typedef so nothing crashes; a later phase replaces
-       this with a class DIE. *)
-    create_runtime_layout_type ~reference Value ?name ~parent_proto_die
-      ~fallback_value_die ()
+  | Object { methods; ivars; parents = _; class_uid = _; open_row } ->
+    (* Parents (inheritance) are deferred: the flattened method/ivar lists
+       already include inherited members. *)
+    let ivars =
+      List.map (fun (ivar_name, _mut, _virt, ty) -> ivar_name, die ty) ivars
+    in
+    let methods =
+      List.map
+        (fun (method_name, privacy, _virt, ty) ->
+          let is_public =
+            match (privacy : S.method_privacy) with
+            | Public_method -> true
+            | Private_method -> false
+          in
+          (* The method's value/return type, only for non-function methods: the
+             [Func] shape carries no argument/return detail to express. *)
+          let method_type_die =
+            match ty.RS.desc with
+            | Func -> None
+            | Unknown _ | Predef _ | Tuple _ | Variant _ | Record _ | Mu _
+            | Rec_var _ | Object _ ->
+              Some (die ty)
+          in
+          ( method_name,
+            is_public,
+            Btype.hash_variant method_name,
+            method_type_die ))
+        methods
+    in
+    create_class_type_die ~reference ~parent_proto_die ?name ~ivars ~methods
+      ~open_row ()
 
 and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     ~fallback_value_die ~rec_env =
