@@ -4023,10 +4023,57 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
             Signature_names.check_class_type names loc cls.cls_ty_id;
             Signature_names.check_type names loc cls.cls_obj_id;
             let uid = cls.cls_decl.cty_uid in
+            (* Under [Debugging_shapes], decompose the class into a structured
+               object shape (methods, instance variables, inherited parents) so
+               the debugger sees its contents. Merlin's [Old_merlin] format
+               keeps the class as an opaque leaf. *)
+            let obj_shape =
+              match !Clflags.shape_format with
+              | Clflags.Old_merlin -> Shape.leaf uid
+              | Clflags.Debugging_shapes ->
+                let rec parent_uid (ce : Typedtree.class_expr) =
+                  match ce.cl_desc with
+                  | Tcl_ident (path, _, _) -> (
+                    match Env.find_class path env with
+                    | cd -> Some cd.cty_uid
+                    | exception Not_found -> None)
+                  | Tcl_apply (ce, _)
+                  | Tcl_fun (_, _, _, ce, _)
+                  | Tcl_let (_, _, _, ce)
+                  | Tcl_constraint (ce, _, _, _, _)
+                  | Tcl_open (_, ce) ->
+                    parent_uid ce
+                  | Tcl_structure _ -> None
+                in
+                let rec inherited_fields (ce : Typedtree.class_expr) =
+                  match ce.cl_desc with
+                  | Tcl_structure str -> str.cstr_fields
+                  | Tcl_apply (ce, _)
+                  | Tcl_fun (_, _, _, ce, _)
+                  | Tcl_let (_, _, _, ce)
+                  | Tcl_constraint (ce, _, _, _, _)
+                  | Tcl_open (_, ce) ->
+                    inherited_fields ce
+                  | Tcl_ident _ -> []
+                in
+                let parents =
+                  List.filter_map
+                    (fun (cf : Typedtree.class_field) ->
+                      match cf.cf_desc with
+                      | Tcf_inherit (_, parent, _, _, _) ->
+                        Option.map Shape.leaf (parent_uid parent)
+                      | Tcf_val _ | Tcf_method _ | Tcf_constraint _
+                      | Tcf_initializer _ | Tcf_attribute _ ->
+                        None)
+                    (inherited_fields cls.cls_info.ci_expr)
+                in
+                Type_shape.Type_decl_shape.of_class_declaration cls.cls_decl
+                  ~parents (Env.shape_for_constr env)
+            in
             let map f id v acc = f acc id v in
             map Shape.Map.add_class cls.cls_id uid acc
             |> map Shape.Map.add_class_type cls.cls_ty_id uid
-            |> map Shape.Map.add_type cls.cls_obj_id (Shape.leaf uid)
+            |> map Shape.Map.add_type cls.cls_obj_id obj_shape
           ) shape_map classes
         in
         Tstr_class

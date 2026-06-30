@@ -1,0 +1,24 @@
+{<Object_shapes>
+ "colored_point"[type] ->
+   Object<Object_shapes.21> methods { get_color: string
+                            ; get_x: int
+                            ; move: Arrow
+                             };
+                            vals { color: string
+                            ; x [mut]: int
+                             };
+                            parents [<Object_shapes.6>
+                            ];
+ "colored_point"[class] -> <Object_shapes.21>;
+ "colored_point"[class type] -> <Object_shapes.21>;
+ "point"[type] ->
+   Object<Object_shapes.6> methods { get_x: int
+                           ; move: Arrow
+                            };
+                           vals { x [mut]: int
+                            };
+                           parents [];
+ "point"[class] -> <Object_shapes.6>;
+ "point"[class type] -> <Object_shapes.6>;
+ }
+

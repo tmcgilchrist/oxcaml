@@ -503,6 +503,10 @@ module Predef = struct
         | String | Simd _ | Exception | Unboxed _), _ -> false
 end
 
+type method_privacy = Public_method | Private_method
+type ivar_mutability = Immutable_ivar | Mutable_ivar
+type member_virtuality = Concrete_member | Virtual_member
+
 type var = Ident.t
 type t = { hash:int; uid: Uid.t option; desc: desc; approximated: bool }
 and desc =
@@ -544,6 +548,13 @@ and desc =
   | Proj_decl of t * Ident.t
   | Unknown_type
   | At_layout of t * Layout.t
+  | Object of
+      { methods : object_method list;
+        ivars : object_ivar list;
+        parents : t list;
+        class_uid : Uid.t option;
+        open_row : bool
+      }
 
 and 'a poly_variant_constructors = 'a poly_variant_constructor list
 
@@ -578,6 +589,20 @@ and constructor_representation = mixed_product_shape
 
 and mixed_product_shape = Layout.t array
 
+and object_method =
+  { om_name : string;
+    om_privacy : method_privacy;
+    om_virtual : member_virtuality;
+    om_type : t
+  }
+
+and object_ivar =
+  { oi_name : string;
+    oi_mutable : ivar_mutability;
+    oi_virtual : member_virtuality;
+    oi_type : t
+  }
+
 let poly_variant_constructors_map f pvs =
   List.map
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
@@ -606,6 +631,21 @@ let equal_complex_constructor eq
   String.equal name1 name2 &&
   Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
+
+let equal_method_privacy p1 p2 =
+  match p1, p2 with
+  | Public_method, Public_method | Private_method, Private_method -> true
+  | (Public_method | Private_method), _ -> false
+
+let equal_ivar_mutability m1 m2 =
+  match m1, m2 with
+  | Immutable_ivar, Immutable_ivar | Mutable_ivar, Mutable_ivar -> true
+  | (Immutable_ivar | Mutable_ivar), _ -> false
+
+let equal_member_virtuality v1 v2 =
+  match v1, v2 with
+  | Concrete_member, Concrete_member | Virtual_member, Virtual_member -> true
+  | (Concrete_member | Virtual_member), _ -> false
 
 let rec equal_desc0 d1 d2 =
   match d1, d2 with
@@ -661,11 +701,17 @@ let rec equal_desc0 d1 d2 =
   | Unknown_type, Unknown_type -> true
   | At_layout (t1, layout1), At_layout (t2, layout2) ->
     equal t1 t2 && Layout.equal layout1 layout2
+  | Object o1, Object o2 ->
+    Bool.equal o1.open_row o2.open_row
+    && Option.equal Uid.equal o1.class_uid o2.class_uid
+    && List.equal equal_object_method o1.methods o2.methods
+    && List.equal equal_object_ivar o1.ivars o2.ivars
+    && List.equal equal o1.parents o2.parents
   | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
     | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
     | Predef _ | Arrow | Poly_variant _ | Tuple _ | Unboxed_tuple _
     | Constr _ | Mutrec _ | Proj_decl _ | Mu _ | Rec_var _ | Unknown_type
-    | At_layout _), _
+    | At_layout _ | Object _), _
     -> false
 
 and equal_desc d1 d2 =
@@ -700,6 +746,18 @@ and equal_poly_variant_constructor
   { pv_constr_name = name2; pv_constr_args = args2 } =
   String.equal name1 name2 &&
   List.equal equal args1 args2
+
+and equal_object_method m1 m2 =
+  String.equal m1.om_name m2.om_name &&
+  equal_method_privacy m1.om_privacy m2.om_privacy &&
+  equal_member_virtuality m1.om_virtual m2.om_virtual &&
+  equal m1.om_type m2.om_type
+
+and equal_object_ivar v1 v2 =
+  String.equal v1.oi_name v2.oi_name &&
+  equal_ivar_mutability v1.oi_mutable v2.oi_mutable &&
+  equal_member_virtuality v1.oi_virtual v2.oi_virtual &&
+  equal v1.oi_type v2.oi_type
 
 let rec print fmt t =
   let print_uid_opt =
@@ -850,6 +908,31 @@ let rec print fmt t =
   | At_layout (shape, layout) ->
     Format.fprintf fmt "(%a : %a)" print_nested shape
       (Format_doc.compat Layout.format) layout
+  | Object { methods; ivars; parents; class_uid; open_row } ->
+    let pp_priv fmt = function
+      | Public_method -> ()
+      | Private_method -> Format.fprintf fmt " [priv]"
+    in
+    let pp_mut fmt = function
+      | Immutable_ivar -> ()
+      | Mutable_ivar -> Format.fprintf fmt " [mut]"
+    in
+    let pp_virt fmt = function
+      | Concrete_member -> ()
+      | Virtual_member -> Format.fprintf fmt " [virt]"
+    in
+    Format.fprintf fmt
+      "Object%a%s @[<v>methods { %a };@ vals { %a };@ parents [%a]@]"
+      print_uid_opt class_uid
+      (if open_row then " (open)" else "")
+      (Format.pp_print_list ~pp_sep:(print_sep_string "; ")
+        (fun fmt m -> Format.fprintf fmt "%s%a%a: %a" m.om_name
+          pp_priv m.om_privacy pp_virt m.om_virtual print m.om_type)) methods
+      (Format.pp_print_list ~pp_sep:(print_sep_string "; ")
+        (fun fmt v -> Format.fprintf fmt "%s%a%a: %a" v.oi_name
+          pp_mut v.oi_mutable pp_virt v.oi_virtual print v.oi_type)) ivars
+      (Format.pp_print_list ~pp_sep:(print_sep_string ", ") print_nested)
+      parents
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
@@ -928,6 +1011,7 @@ let hash_mutrec = 21
 let hash_proj_decl = 22
 let hash_unknown_type = 23
 let hash_at_layout = 24
+let hash_object = 25
 
 let fresh_var ?(name="shape-var") uid =
   let var = Ident.create_local name in
@@ -1099,6 +1183,18 @@ let at_layout ?uid shape layout =
     hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
     approximated = false }
 
+let object_ ?uid ~methods ~ivars ~parents ~class_uid ~open_row () =
+  { uid; desc = Object { methods; ivars; parents; class_uid; open_row };
+    hash = Hashtbl.hash (hash_object, uid, class_uid, open_row,
+      List.map
+        (fun m -> (m.om_name, m.om_privacy, m.om_virtual, m.om_type.hash))
+        methods,
+      List.map
+        (fun v -> (v.oi_name, v.oi_mutable, v.oi_virtual, v.oi_type.hash))
+        ivars,
+      List.map (fun (p : t) -> p.hash) parents);
+    approximated = false }
+
 let decompose_abs t =
   match t.desc with
   | Abs (x, t) -> Some (x, t)
@@ -1174,6 +1270,9 @@ let set_uid_if_none t uid =
   | Proj_decl (t, i) -> proj_decl ~uid t i
   | Unknown_type -> unknown_type ~uid ()
   | At_layout (shape, layout) -> at_layout ~uid shape layout
+  | Object o ->
+    object_ ~uid ~methods:o.methods ~ivars:o.ivars ~parents:o.parents
+      ~class_uid:o.class_uid ~open_row:o.open_row ()
 
 
 module Map = struct

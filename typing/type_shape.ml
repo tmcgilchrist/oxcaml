@@ -100,6 +100,12 @@ end = struct
         (subst arg_shape) arg_layout
     | Unknown_type -> Shape.unknown_type ?uid:outer.uid ()
     | At_layout (shape, layout) -> Shape.at_layout ?uid:outer.uid shape layout
+    | Object { methods; ivars; parents; class_uid; open_row } ->
+      Shape.object_ ?uid:outer.uid
+        ~methods:
+          (List.map (fun m -> { m with om_type = subst m.om_type }) methods)
+        ~ivars:(List.map (fun v -> { v with oi_type = subst v.oi_type }) ivars)
+        ~parents:(subst_list parents) ~class_uid ~open_row ()
 
   type t =
     { uid : Uid.t;
@@ -305,9 +311,53 @@ module Type_shape = struct
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Tunboxed_tuple exprs ->
             Shape.unboxed_tuple (of_expr_list (List.map snd exprs))
-          | Tobject _ | Tnil | Tfield _ ->
-            unknown_shape_value
-            (* Objects are currently not supported in the debugger. *)
+          | Tobject (fields, name_opt) ->
+            (* A value's object type lists only methods (instance variables are
+               private to the class). We walk the [Tfield]/[Tnil] chain here
+               rather than via [Ctype] to avoid a module dependency cycle; the
+               remaining row is a type variable when the row is open (a lower
+               bound). Recursion into method types ties off the object
+               self-type via the shared [visited]/[Mu] machinery. *)
+            let rec flatten_fields acc ty =
+              match Types.get_desc ty with
+              | Tfield (mname, mkind, mty, rest) ->
+                flatten_fields ((mname, mkind, mty) :: acc) rest
+              | Tvar _ | Tunivar _ -> List.rev acc, true
+              | Tnil | Tconstr _ | Ttuple _ | Tpoly _ | Trepr _
+              | Tunboxed_tuple _ | Tobject _ | Tlink _ | Tsubst _ | Tvariant _
+              | Tarrow _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+              | Tbox _ | Tpackage _ ->
+                List.rev acc, false
+            in
+            let field_list, open_row = flatten_fields [] fields in
+            let methods =
+              List.map
+                (fun (mname, mkind, mty) ->
+                  { Shape.om_name = mname;
+                    om_privacy =
+                      (match Types.field_kind_repr mkind with
+                      | Fprivate -> Shape.Private_method
+                      | Fpublic | Fabsent -> Shape.Public_method);
+                    om_virtual = Shape.Concrete_member;
+                    om_type =
+                      of_type_expr_go ~depth ~visited mty subst shape_for_constr
+                  })
+                field_list
+            in
+            let class_uid =
+              match !name_opt with
+              | Some (path, name_args) -> (
+                match shape_for_constr path ~args:(of_expr_list name_args) with
+                | Some sh -> sh.Shape.uid
+                | None -> None)
+              | None -> None
+            in
+            Shape.object_ ~methods ~ivars:[] ~parents:[] ~class_uid ~open_row ()
+          | Tnil | Tfield _ ->
+            (* A bare field chain without an enclosing [Tobject] is treated as
+               an empty, open structural object rather than an unknown value. *)
+            Shape.object_ ~methods:[] ~ivars:[] ~parents:[] ~class_uid:None
+              ~open_row:true ()
           | Tlink _ | Tsubst _ ->
             if !Clflags.dwarf_pedantic
             then
@@ -695,6 +745,10 @@ module Type_decl_shape = struct
       is_closed_type_shape sh
     | Record { fields; kind = _ } ->
       List.for_all (fun (_, _, sh, _) -> is_closed_type_shape sh) fields
+    | Object { methods; ivars; parents; class_uid = _; open_row = _ } ->
+      List.for_all (fun m -> is_closed_type_shape m.om_type) methods
+      && List.for_all (fun v -> is_closed_type_shape v.oi_type) ivars
+      && List.for_all is_closed_type_shape parents
     | Unknown_type -> true
     | Var _
     | App (_, _)
@@ -817,6 +871,70 @@ module Type_decl_shape = struct
       in
       Shape.set_uid_if_none record ext.ext_uid
     | Cstr_tuple _ -> Shape.leaf ext.ext_uid
+
+  (* Build a structured shape for a class declaration. Unlike the value-side
+     [Type_shape.of_type_expr] on an object type (which sees methods only),
+     this pulls instance variables and method privacy/virtuality from the class
+     signature. [parents] are precomputed references to the inherited classes
+     (the caller resolves them, since that needs the typed class structure). *)
+  let of_class_declaration (decl : Types.class_declaration) ~parents
+      shape_for_constr =
+    let sign = Btype.signature_of_class_type decl.cty_type in
+    let type_param_idents =
+      List.map
+        (fun _ ->
+          let name = Format.asprintf "a/%d" !type_var_count in
+          type_var_count := !type_var_count + 1;
+          Ident.create_local name)
+        decl.cty_params
+    in
+    let type_param_shapes =
+      List.map (fun id -> Shape.var' None id) type_param_idents
+    in
+    let type_subst = List.combine decl.cty_params type_param_shapes in
+    let conv ty =
+      Type_shape.of_type_expr_with_type_subst ty shape_for_constr type_subst
+    in
+    let virtuality = function
+      | Asttypes.Virtual -> Shape.Virtual_member
+      | Asttypes.Concrete -> Shape.Concrete_member
+    in
+    let methods =
+      Types.Meths.fold
+        (fun name (priv, virt, ty) acc ->
+          { Shape.om_name = name;
+            om_privacy =
+              (match priv with
+              | Types.Mpublic -> Shape.Public_method
+              | Types.Mprivate _ -> Shape.Private_method);
+            om_virtual = virtuality virt;
+            om_type = conv ty
+          }
+          :: acc)
+        sign.csig_meths []
+      |> List.rev
+    in
+    let ivars =
+      Types.Vars.fold
+        (fun name (mut, virt, ty) acc ->
+          { Shape.oi_name = name;
+            oi_mutable =
+              (match mut with
+              | Asttypes.Mutable -> Shape.Mutable_ivar
+              | Asttypes.Immutable -> Shape.Immutable_ivar);
+            oi_virtual = virtuality virt;
+            oi_type = conv ty
+          }
+          :: acc)
+        sign.csig_vars []
+      |> List.rev
+    in
+    let obj =
+      Shape.object_ ~methods ~ivars ~parents ~class_uid:(Some decl.cty_uid)
+        ~open_row:false ()
+    in
+    let decl_shape = Shape.abs_list obj type_param_idents in
+    Shape.set_uid_if_none decl_shape decl.cty_uid
 end
 
 let rec decompose_application (t : Shape.t) =
@@ -835,7 +953,7 @@ let rec decompose_application (t : Shape.t) =
   | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
   | Record _ | Mutrec _
   | Proj_decl (_, _)
-  | Unknown_type | At_layout _ ->
+  | Unknown_type | At_layout _ | Object _ ->
     t, []
 
 let find_constr_id_with_args (subst_constr, _) id args =
@@ -987,7 +1105,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
       | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _
       | Variant_unboxed _ | Record _
       | Proj_decl (_, _)
-      | Leaf ->
+      | Object _ | Leaf ->
         if !Clflags.dwarf_pedantic
         then
           Misc.fatal_errorf
@@ -1009,7 +1127,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
     | Predef (_, _)
     | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
     | Record _ | Mutrec _ | Unknown_type
-    | At_layout (_, _) ->
+    | At_layout (_, _)
+    | Object _ ->
       None
   in
   let result =
@@ -1048,7 +1167,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
         | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _
         | Variant_unboxed _ | Record _ | Mutrec _
         | Proj_decl (_, _)
-        | Unknown_type | At_layout _ ->
+        | Unknown_type | At_layout _ | Object _ ->
           Shape.app f ~arg)
       | Proj_decl _ ->
         Shape.unknown_type ()
@@ -1069,6 +1188,20 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
              (fun (name, uid_opt, sh, ly) ->
                name, uid_opt, unfold_and_eval sh, ly)
              fields)
+      | Object { methods; ivars; parents; class_uid; open_row } ->
+        Shape.object_
+          ~methods:
+            (List.map
+               (fun (m : Shape.object_method) ->
+                 { m with Shape.om_type = unfold_and_eval m.om_type })
+               methods)
+          ~ivars:
+            (List.map
+               (fun (v : Shape.object_ivar) ->
+                 { v with Shape.oi_type = unfold_and_eval v.oi_type })
+               ivars)
+          ~parents:(unfold_and_eval_list parents)
+          ~class_uid ~open_row ()
       | Poly_variant constrs ->
         Shape.poly_variant
           (Shape.poly_variant_constructors_map unfold_and_eval constrs)

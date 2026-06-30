@@ -44,6 +44,12 @@ module Type_decl_shape : sig
   val of_type_declaration :
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 
+  (** Build a structured object shape from a class declaration, carrying
+      methods, instance variables, and the given inherited-class [parents]
+      references. Used for DWARF (the [Debugging_shapes] format). *)
+  val of_class_declaration :
+    Types.class_declaration -> parents:Shape.t list -> path_lookup -> Shape.t
+
   (* CR sspies: The treatment of extension constructors for the debugger has to
      be revised if we want to support them properly. The extension constructor
      declarations allocate new runtime objects that we would then have to find

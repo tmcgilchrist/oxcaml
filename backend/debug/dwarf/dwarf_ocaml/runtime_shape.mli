@@ -122,6 +122,19 @@ and desc = private
   | Func
   | Mu of t
   | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
+  | Object of
+      { methods :
+          (string * Shape.method_privacy * Shape.member_virtuality * t) list;
+        ivars :
+          (string * Shape.ivar_mutability * Shape.member_virtuality * t) list;
+        parents : t list;
+        class_uid : Shape.Uid.t option;
+        open_row : bool
+      }
+      (** A class or object type. [methods] and [ivars] carry the member name,
+          privacy/mutability, virtuality and type; [parents] are the inherited
+          classes; [open_row] flags a structural object whose method list is a
+          lower bound. *)
 (* CR sspies: Use regular identifiers beforehand and only switch to DeBruijn at
    this level. *)
 
@@ -292,6 +305,15 @@ val mu : t -> t
 
 (** Create a reference to a recursive binding using de Bruijn indexing. *)
 val rec_var : Shape.DeBruijn_index.t -> Runtime_layout.t -> t
+
+(** Create an object/class runtime shape (always value layout). *)
+val object_ :
+  methods:(string * Shape.method_privacy * Shape.member_virtuality * t) list ->
+  ivars:(string * Shape.ivar_mutability * Shape.member_virtuality * t) list ->
+  parents:t list ->
+  class_uid:Shape.Uid.t option ->
+  open_row:bool ->
+  t
 
 (** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t

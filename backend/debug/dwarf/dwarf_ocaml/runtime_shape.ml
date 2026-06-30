@@ -186,6 +186,15 @@ and desc =
   | Func
   | Mu of t
   | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
+  | Object of
+      { methods :
+          (string * Shape.method_privacy * Shape.member_virtuality * t) list;
+        ivars :
+          (string * Shape.ivar_mutability * Shape.member_virtuality * t) list;
+        parents : t list;
+        class_uid : Shape.Uid.t option;
+        open_row : bool
+      }
 (* The layout is part of [Unknown] and [Rec_var] to ensure that equality can be
    tested by simply comparing the descriptions. That is, the runtime_layout and
    hash fields are just precomputed from the desc field and carry no additional
@@ -299,6 +308,8 @@ let hash_func = 5
 let hash_mu = 6
 
 let hash_rec_var = 7
+
+let hash_object = 8
 
 (* Hash constants for predef constructors *)
 let hash_predef_array = 0
@@ -571,6 +582,20 @@ let rec_var var ly =
   let desc = Rec_var (var, ly) in
   { desc; runtime_layout = ly; hash = Hashtbl.hash (hash_rec_var, (var, ly)) }
 
+let object_ ~methods ~ivars ~parents ~class_uid ~open_row =
+  let desc = Object { methods; ivars; parents; class_uid; open_row } in
+  { desc;
+    runtime_layout = Value;
+    hash =
+      Hashtbl.hash
+        ( hash_object,
+          class_uid,
+          open_row,
+          List.map (fun (n, p, v, t) -> n, p, v, hash t) methods,
+          List.map (fun (n, m, v, t) -> n, m, v, hash t) ivars,
+          List.map hash parents )
+  }
+
 let print_runtime_layout fmt (t : Runtime_layout.t) =
   Format.pp_print_string fmt (Runtime_layout.to_string t)
 
@@ -679,6 +704,20 @@ let rec print fmt { desc } =
   | Rec_var (idx, ly) ->
     Format.fprintf fmt "Rec_var(%a, %a)" Shape.DeBruijn_index.print idx
       Runtime_layout.print ly
+  | Object { methods; ivars; parents; class_uid = _; open_row } ->
+    let pp_sep fmt () = Format.fprintf fmt "; " in
+    let pp_meth fmt (name, _, _, ty) =
+      Format.fprintf fmt "%s: %a" name print ty
+    in
+    let pp_ivar fmt (name, _, _, ty) =
+      Format.fprintf fmt "%s: %a" name print ty
+    in
+    Format.fprintf fmt "Object%s(methods [%a]; vals [%a]; %d parents)"
+      (if open_row then "(open)" else "")
+      (Format.pp_print_list ~pp_sep pp_meth)
+      methods
+      (Format.pp_print_list ~pp_sep pp_ivar)
+      ivars (List.length parents)
 
 and print_predef fmt p =
   match p with
@@ -795,8 +834,39 @@ let rec equal { desc = desc1 } { desc = desc2 } =
   | Mu shape1, Mu shape2 -> equal shape1 shape2
   | Rec_var (idx1, ly1), Rec_var (idx2, ly2) ->
     Shape.DeBruijn_index.equal idx1 idx2 && Runtime_layout.equal ly1 ly2
+  | ( Object
+        { methods = m1;
+          ivars = i1;
+          parents = p1;
+          class_uid = c1;
+          open_row = o1
+        },
+      Object
+        { methods = m2;
+          ivars = i2;
+          parents = p2;
+          class_uid = c2;
+          open_row = o2
+        } ) ->
+    Bool.equal o1 o2
+    && Option.equal Shape.Uid.equal c1 c2
+    && List.equal
+         (fun (n1, pr1, v1, t1) (n2, pr2, v2, t2) ->
+           String.equal n1 n2
+           && Shape.equal_method_privacy pr1 pr2
+           && Shape.equal_member_virtuality v1 v2
+           && equal t1 t2)
+         m1 m2
+    && List.equal
+         (fun (n1, mu1, v1, t1) (n2, mu2, v2, t2) ->
+           String.equal n1 n2
+           && Shape.equal_ivar_mutability mu1 mu2
+           && Shape.equal_member_virtuality v1 v2
+           && equal t1 t2)
+         i1 i2
+    && List.equal equal p1 p2
   | ( ( Unknown _ | Predef _ | Tuple _ | Variant _ | Record _ | Func | Mu _
-      | Rec_var _ ),
+      | Rec_var _ | Object _ ),
       _ ) ->
     false
 

@@ -166,6 +166,15 @@ end) = struct
         }
     | NUnknown_type
     | NAt_layout of nf * Layout.t
+    | NObject of
+        { methods : (string * method_privacy * member_virtuality * delayed_nf)
+            list;
+          ivars : (string * ivar_mutability * member_virtuality * delayed_nf)
+            list;
+          parents : nf list;
+          class_uid : Uid.t option;
+          open_row : bool
+        }
 
   (* A type of normal forms for strong call-by-need evaluation.
      The normal form of an abstraction
@@ -276,11 +285,25 @@ end) = struct
     | NUnknown_type, NUnknown_type -> true
     | NAt_layout (nf1, layout1), NAt_layout (nf2, layout2) ->
       equal_nf nf1 nf2 && Layout.equal layout1 layout2
+    | NObject o1, NObject o2 ->
+      Bool.equal o1.open_row o2.open_row &&
+      Option.equal Uid.equal o1.class_uid o2.class_uid &&
+      List.equal
+        (fun (n1, p1, v1, d1) (n2, p2, v2, d2) ->
+          String.equal n1 n2 && equal_method_privacy p1 p2 &&
+          equal_member_virtuality v1 v2 && equal_delayed_nf d1 d2)
+        o1.methods o2.methods &&
+      List.equal
+        (fun (n1, m1, v1, d1) (n2, m2, v2, d2) ->
+          String.equal n1 n2 && equal_ivar_mutability m1 m2 &&
+          equal_member_virtuality v1 v2 && equal_delayed_nf d1 d2)
+        o1.ivars o2.ivars &&
+      List.equal equal_nf o1.parents o2.parents
     | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ | NMutrec _ | NProj_decl _ | NMu _
-        | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
+        | NRec_var _ | NUnknown_type | NAt_layout _ | NObject _ ), _ ) -> false
 
   and equal_nf t1 t2 =
     if not (Option.equal Uid.equal t1.uid t2.uid) then false
@@ -609,6 +632,27 @@ end) = struct
       | At_layout (shape, layout) ->
           let nf = reduce env shape in
           return (NAt_layout (nf, layout))
+      | Object { methods; ivars; parents; class_uid; open_row } ->
+          let methods =
+            List.map
+              (fun (m : object_method) ->
+                ( m.om_name,
+                  m.om_privacy,
+                  m.om_virtual,
+                  delay_reduce env m.om_type ))
+              methods
+          in
+          let ivars =
+            List.map
+              (fun (v : object_ivar) ->
+                ( v.oi_name,
+                  v.oi_mutable,
+                  v.oi_virtual,
+                  delay_reduce env v.oi_type ))
+              ivars
+          in
+          let parents = List.map (reduce env) parents in
+          return (NObject { methods; ivars; parents; class_uid; open_row })
     )
 
   and read_back env (nf : nf) : t =
@@ -693,6 +737,19 @@ end) = struct
     | NAt_layout (nf, layout) ->
       let shape = read_back nf in
       at_layout ?uid shape layout
+    | NObject { methods; ivars; parents; class_uid; open_row } ->
+      let methods =
+        List.map (fun (name, priv, virt, dnf) ->
+          { om_name = name; om_privacy = priv; om_virtual = virt;
+            om_type = read_back_force dnf }) methods
+      in
+      let ivars =
+        List.map (fun (name, mut, virt, dnf) ->
+          { oi_name = name; oi_mutable = mut; oi_virtual = virt;
+            oi_type = read_back_force dnf }) ivars
+      in
+      let parents = List.map read_back parents in
+      object_ ?uid ~methods ~ivars ~parents ~class_uid ~open_row ()
 
   (* Sharing the memo tables is safe at the level of a compilation unit since
     idents should be unique *)
@@ -739,7 +796,7 @@ end) = struct
     | NRec_var _ -> false
     | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
     | NPredef _ | NArrow | NPoly_variant _ | NVariant _ | NVariant_unboxed _
-    | NRecord _ | NUnknown_type | NAt_layout _ -> false
+    | NRecord _ | NUnknown_type | NAt_layout _ | NObject _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with

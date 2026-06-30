@@ -736,6 +736,32 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           "variant with [@@unboxed] attribute with expected layout %a, but \
            field has layout %a"
           pp_layout ly pp_layout arg_layout)
+  | ( Object { methods; ivars; parents; class_uid; open_row },
+      (None | Some (Base Scannable)) ) -> (
+    (* An object is a single boxed value; its members are all values. *)
+    let conv (sh : S.t) =
+      force_runtime_shape_exn
+        (type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Scannable))
+    in
+    try
+      let methods =
+        List.map
+          (fun (m : S.object_method) ->
+            m.S.om_name, m.S.om_privacy, m.S.om_virtual, conv m.S.om_type)
+          methods
+      in
+      let ivars =
+        List.map
+          (fun (v : S.object_ivar) ->
+            v.S.oi_name, v.S.oi_mutable, v.S.oi_virtual, conv v.S.oi_type)
+          ivars
+      in
+      let parents = List.map conv parents in
+      runtime (RS.object_ ~methods ~ivars ~parents ~class_uid ~open_row)
+    with Layout_missing -> runtime (RS.unknown Value))
+  | Object _, Some ((Product _ | Base _) as ly) ->
+    err_or_unknown_exn (fun f ->
+        f "object must have value layout, but got: %a" pp_layout ly)
   | _, Some (Univar _) ->
     Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
   | _, Some (Genvar _) ->

@@ -226,6 +226,10 @@ module Predef : sig
   val simd_vec_split_to_byte_size : simd_vec_split -> int
 end
 
+type method_privacy = Public_method | Private_method
+type ivar_mutability = Immutable_ivar | Mutable_ivar
+type member_virtuality = Concrete_member | Virtual_member
+
 type var = Ident.t
 type t = private { hash: int; uid: Uid.t option; desc: desc; approximated: bool }
 and desc =
@@ -282,6 +286,20 @@ and desc =
     (** [Unknown_type] represents an unknown type. *)
   | At_layout of t * Layout.t
     (** [At_layout (shape, layout)] represents a shape with a known layout. *)
+  | Object of
+      { methods : object_method list;
+        ivars : object_ivar list;
+        parents : t list;       (** inherited class shapes, for DWARF *)
+        class_uid : Uid.t option;
+        (** [Some] for a named class instance, [None] for a structural
+            object. *)
+        open_row : bool
+        (** [true] if the object's row is open: the method list is a lower
+            bound (row polymorphism), not a complete class. *)
+      }
+    (** A class or object type. Instance variables are only populated when the
+        shape is built from a class declaration; a shape built from a value's
+        object type carries methods only. *)
 
 (** For DWARF type emission to work as expected, we store the layouts in the
     declaration alongside the shapes in those cases where the layout "expands"
@@ -332,6 +350,20 @@ and constructor_representation = mixed_product_shape
 
 and mixed_product_shape = Layout.t array
 
+and object_method =
+  { om_name : string;
+    om_privacy : method_privacy;
+    om_virtual : member_virtuality;
+    om_type : t
+  }
+
+and object_ivar =
+  { oi_name : string;
+    oi_mutable : ivar_mutability;
+    oi_virtual : member_virtuality;
+    oi_type : t
+  }
+
 
 
 val print : Format.formatter -> t -> unit
@@ -344,6 +376,10 @@ val equal_record_kind : record_kind -> record_kind -> bool
 
 val equal_complex_constructor :
   ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
+
+val equal_method_privacy : method_privacy -> method_privacy -> bool
+val equal_ivar_mutability : ivar_mutability -> ivar_mutability -> bool
+val equal_member_virtuality : member_virtuality -> member_virtuality -> bool
 
 (* Smart constructors *)
 
@@ -384,6 +420,9 @@ val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
 val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
 val unknown_type : ?uid:Uid.t -> unit -> t
 val at_layout : ?uid:Uid.t -> t -> Layout.t -> t
+val object_ :
+  ?uid:Uid.t -> methods:object_method list -> ivars:object_ivar list ->
+  parents:t list -> class_uid:Uid.t option -> open_row:bool -> unit -> t
 
 
 val set_approximated : approximated:bool -> t -> t

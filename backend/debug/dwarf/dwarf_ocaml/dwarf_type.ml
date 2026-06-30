@@ -1420,6 +1420,13 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
        be enough. *)
     let reference' = die_with_extended_env sh reference in
     create_typedef_die ~reference ~parent_proto_die ?name reference'
+  | Object _ ->
+    (* TODO The structured object shape reaches the backend but
+       is not yet emitted as a [DW_TAG_class_type] with members and methods.
+       Emit a plain value typedef so nothing crashes; a later phase replaces
+       this with a class DIE. *)
+    create_runtime_layout_type ~reference Value ?name ~parent_proto_die
+      ~fallback_value_die ()
 
 and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     ~fallback_value_die ~rec_env =
