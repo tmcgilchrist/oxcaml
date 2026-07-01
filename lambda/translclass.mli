@@ -19,6 +19,7 @@ open Debuginfo.Scoped_location
 
 val transl_class :
   scopes:scopes -> Ident.t list -> Ident.t ->
+  class_uid:Shape.Uid.t option ->
   string list -> class_expr -> Asttypes.virtual_flag ->
   lambda * Value_rec_types.recursive_binding_kind
 

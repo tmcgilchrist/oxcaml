@@ -522,8 +522,9 @@ let transl_class_bindings ~scopes cl_list =
   let ids = List.map (fun (ci, _) -> ci.ci_id_class) cl_list in
   (ids,
    List.map
-     (fun ({ci_id_class=id; ci_expr=cl; ci_virt=vf}, meths) ->
-       let def, rkind = transl_class ~scopes ids id meths cl vf in
+     (fun ({ci_id_class=id; ci_expr=cl; ci_virt=vf; ci_decl; _}, meths) ->
+       let class_uid = Some ci_decl.Types.cty_uid in
+       let def, rkind = transl_class ~scopes ids id ~class_uid meths cl vf in
        (* CR sspies: Can we find a better [debug_uid] here? *)
        (id, Lambda.debug_uid_none, rkind, def))
      cl_list)

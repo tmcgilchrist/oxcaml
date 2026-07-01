@@ -379,17 +379,19 @@ let create_record_die ~reference ~parent_proto_die ?name ~fields () =
     fields;
   wrap_die_under_a_pointer ~proto_die:structure ~reference ~parent_proto_die
 
-(* Emit a [DW_TAG_class_type] for an OCaml object/class. Members (instance
-   variables) are marked [DW_AT_declaration] with no [data_member_location]: the
-   slot layout is assigned at runtime by [CamlinternalOO], so we never assert an
-   offset (filling those in is a later phase). Methods become
+(* Emit a [DW_TAG_class_type] for an OCaml object/class. Each instance-variable
+   [DW_TAG_member] carries a [DW_AT_data_member_location] when the class's slot
+   layout is statically known (non-inherited classes, recorded in
+   [Type_shape.all_class_ivar_offsets] during lambda translation); otherwise it
+   is marked [DW_AT_declaration], since [CamlinternalOO] assigns the slot at
+   runtime and we never assert an offset we can't back up. Methods become
    [DW_TAG_subprogram] declarations carrying a [DW_AT_OCAML_method_hash] in
    place of a vtable slot (OCaml dispatches public methods by a runtime hash
    search, not a fixed index), plus an artificial [self] receiver typed as the
    enclosing object (the analogue of C++'s [this]). [ivars] and [methods] carry
    already-built child type DIE references. *)
-let create_class_type_die ~reference ~parent_proto_die ?name ~ivars ~methods
-    ~open_row () =
+let create_class_type_die ~reference ~parent_proto_die ?name ~class_uid ~ivars
+    ~methods ~open_row () =
   let cls =
     Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Class_type
       ~attribute_values:
@@ -397,14 +399,28 @@ let create_class_type_die ~reference ~parent_proto_die ?name ~ivars ~methods
         |> attribute_list_with_optional_name name)
       ()
   in
+  let ivar_offsets =
+    match class_uid with
+    | Some uid -> Shape.Uid.Tbl.find_opt Type_shape.all_class_ivar_offsets uid
+    | None -> None
+  in
   List.iter
     (fun (ivar_name, ivar_die) ->
+      let location_attr =
+        match
+          Option.bind ivar_offsets (Misc.Stdlib.String.Map.find_opt ivar_name)
+        with
+        | Some field_index ->
+          DAH.create_data_member_location_offset
+            ~byte_offset:(Int64.of_int (field_index * Arch.size_addr))
+        | None -> DAH.create_declaration ()
+      in
       let member =
         Proto_die.create ~parent:(Some cls) ~tag:Dwarf_tag.Member
           ~attribute_values:
             [ DAH.create_name ivar_name;
               DAH.create_type_from_reference ~proto_die_reference:ivar_die;
-              DAH.create_declaration () ]
+              location_attr ]
           ()
       in
       Debugging_the_compiler.add
@@ -1481,7 +1497,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
        be enough. *)
     let reference' = die_with_extended_env sh reference in
     create_typedef_die ~reference ~parent_proto_die ?name reference'
-  | Object { methods; ivars; parents = _; class_uid = _; open_row } ->
+  | Object { methods; ivars; parents = _; class_uid; open_row } ->
     (* Parents (inheritance) are deferred: the flattened method/ivar lists
        already include inherited members. *)
     let ivars =
@@ -1510,8 +1526,8 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
             method_type_die ))
         methods
     in
-    create_class_type_die ~reference ~parent_proto_die ?name ~ivars ~methods
-      ~open_row ()
+    create_class_type_die ~reference ~parent_proto_die ?name ~class_uid ~ivars
+      ~methods ~open_row ()
 
 and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     ~fallback_value_die ~rec_env =

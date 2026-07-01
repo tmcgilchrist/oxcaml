@@ -1098,7 +1098,51 @@ let free_methods l =
       fatal_error_invalid_constructor l
   in free l; !fv
 
-let transl_class ~scopes ids cl_id pub_meths cl vflag =
+(* An object block is [field 0 = method table; field 1 = object id; field 2+ =
+   variable slots]. We can assert a static object-field offset for an instance
+   variable only when the first ivar slot is provably field 2, i.e. no object
+   slot precedes it. Slots can be introduced before the structure's own ivars
+   by (a) inheritance — the parent's slots, possibly cross-unit; (b) captured
+   class parameters / [let]-bound values; and (c) the [env2] slot of a
+   non-[top] class that captures its environment. Predicting how many such
+   slots exist is
+   unreliable (a parameter used only in an initializer takes no slot, while one
+   captured by a method does), so we restrict to the provably-safe case: a
+   top-level, non-inherited class whose body is a plain structure with no
+   parameter/[let] wrappers. Every other class keeps [DW_AT_declaration]. *)
+let rec plain_structure cl =
+  match cl.cl_desc with
+  | Tcl_structure str -> Some str
+  | Tcl_apply (cl, _) | Tcl_open (_, cl) | Tcl_constraint (cl, _, _, _, _) ->
+    plain_structure cl
+  | Tcl_fun _ | Tcl_let _ | Tcl_ident _ -> None
+
+let register_ivar_offsets ~class_uid ~top cl =
+  match class_uid with
+  | Some class_uid
+    when top && !Clflags.debug
+         && !Clflags.shape_format = Clflags.Debugging_shapes -> (
+    match plain_structure cl with
+    | Some str
+      when not
+             (List.exists
+                (fun f ->
+                  match f.cf_desc with Tcf_inherit _ -> true | _ -> false)
+                str.cstr_fields) ->
+      (* No preceding slots: the first instance variable is object field 2. *)
+      let _, ivars =
+        List.fold_left
+          (fun (i, acc) f ->
+            match f.cf_desc with
+            | Tcf_val (name, _, _, _, false) -> i + 1, (name.txt, 2 + i) :: acc
+            | _ -> i, acc)
+          (0, []) str.cstr_fields
+      in
+      Type_shape.add_class_ivar_offsets class_uid (List.rev ivars)
+    | _ -> ())
+  | _ -> ()
+
+let transl_class ~scopes ids cl_id ~class_uid pub_meths cl vflag =
   let open Value_rec_types in
   (* First check if it is not only a rebind *)
   let rebind = transl_class_rebind ~scopes cl vflag in
@@ -1109,6 +1153,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   let tables = Ident.create_local (Ident.name cl_id ^ "_tables") in
   let (top_env, req) = oo_add_class tables in
   let top = not req in
+  register_ivar_offsets ~class_uid ~top cl;
   (* The manual specifies that toplevel lets *must* be evaluated outside of the
      class *)
   let cl_env, llets = build_class_lets ~scopes cl in
@@ -1421,12 +1466,15 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   let vflag = vf in
 *)
 
-let transl_class ~scopes ids id pub_meths cl vf =
-  oo_wrap_gen cl.cl_env false (transl_class ~scopes ids id pub_meths cl) vf
+let transl_class ~scopes ids id ~class_uid pub_meths cl vf =
+  oo_wrap_gen cl.cl_env false
+    (transl_class ~scopes ids id ~class_uid pub_meths cl) vf
 
 let () =
   transl_object := (fun ~scopes id meths cl ->
-    let lam, _rkind = transl_class ~scopes [] id meths cl Concrete in
+    let lam, _rkind =
+      transl_class ~scopes [] id ~class_uid:None meths cl Concrete
+    in
     lam)
 
 (* Error report *)

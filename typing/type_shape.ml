@@ -1269,6 +1269,21 @@ let (all_type_decls : Shape.t Uid.Tbl.t) = Uid.Tbl.create 16
 
 let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
 
+(* Object-block field index of each instance variable of a class, keyed by the
+   class [Uid.t]. Populated during lambda translation (where the
+   [CamlinternalOO] slot allocation order is known) for non-inherited classes;
+   read by the DWARF backend to emit [DW_AT_data_member_location]. *)
+let (all_class_ivar_offsets : int Misc.Stdlib.String.Map.t Uid.Tbl.t) =
+  Uid.Tbl.create 16
+
+let add_class_ivar_offsets class_uid (offsets : (string * int) list) =
+  let map =
+    List.fold_left
+      (fun m (name, index) -> Misc.Stdlib.String.Map.add name index m)
+      Misc.Stdlib.String.Map.empty offsets
+  in
+  Uid.Tbl.add all_class_ivar_offsets class_uid map
+
 let add_to_type_decls (decls : (Ident.t * Types.type_declaration) list)
     shape_for_constr =
   let type_decl_shapes =
