@@ -3033,8 +3033,12 @@ let close_functions acc external_env ~current_region function_declarations =
         let function_slot = Function_decl.function_slot decl in
         let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
         let code_id =
+          (* Use the stamp-free [Function_slot.name] rather than [to_string]:
+             [Code_id.create] appends its own unique stamp suffix, so the
+             embedded function-slot stamp is not needed for uniqueness here and
+             only clutters the demangled symbol (e.g. [Main.say_hello_0]). *)
           Code_id.create
-            ~name:(Function_slot.to_string function_slot)
+            ~name:(Function_slot.name function_slot)
             ~debug:function_dbg compilation_unit
         in
         Function_slot.Map.add function_slot code_id map)
