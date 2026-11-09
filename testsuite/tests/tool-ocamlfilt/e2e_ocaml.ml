@@ -178,6 +178,28 @@ module Option_monad = struct
     Some (x + y)
 end
 
+(* {1 Effect handlers}
+
+   A [match] with an [effect] case is compiled into four closures: the
+   value arm, the exception arm, the effect arm and a thunk running the
+   scrutinee. Each is an anonymous function of the enclosing function, so
+   they are numbered with its other anonymous functions: here [fn_{0}] to
+   [fn_{3}] in creation order, and the [fun] after the match is
+   [fn_{4}]. *)
+
+module Effects = struct
+  type _ Effect.t += Peek : int Effect.t
+
+  let run_handler i =
+    let r =
+      match Effect.perform Peek + i with
+      | v -> v + 1
+      | exception Not_found -> 0
+      | effect Peek, k -> Effect.Deep.continue k 42
+    in
+    List.map (fun x -> x + r) [ i ]
+end
+
 (* {1 Extended indexing operators (heavy non-output character escaping)} *)
 
 module Indexing = struct
@@ -623,6 +645,7 @@ let _ =
   ignore (with_open_in [ -1; 2; -3; 4 ]);
   ignore Option_monad.(chain 5);
   ignore Option_monad.(with_let_star 1 2);
+  ignore (Effects.run_handler 1);
   ignore (Indexing.demo ());
   let pt = new point2d 0 0 in
   pt#translate 1 1;

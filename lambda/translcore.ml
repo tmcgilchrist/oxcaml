@@ -3289,14 +3289,25 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
       attributes = Lambda.default_param_attribute;
       mode = alloc_heap }
   in
+  (* The handler arms and the body thunk are synthesized anonymous functions,
+     so give each its own scope (as [transl_function] would) and a location, so
+     they are named under the enclosing scope rather than the compilation unit.
+     Their bodies are written as part of the enclosing function, so like a
+     let-operator continuation they inherit its zero_alloc assumption. *)
+  let enter_handler_scope ~scopes =
+    enter_anonymous_function ~scopes
+      ~assume_zero_alloc:(get_assume_zero_alloc ~scopes)
+  in
   let val_fun =
+    let scopes = enter_handler_scope ~scopes in
+    let loc = of_location ~scopes e.exp_loc in
     match val_caselist with
     | None ->
         let param = Ident.create_local "param" in
         lfunction ~kind:(Curried {nlocal=0})
          ~params:[mk_param param Lambda.debug_uid_none body_layout]
          ~return:return_layout ~body:(Lvar param)
-         ~attr:default_function_attribute ~loc:Loc_unknown
+         ~attr:default_function_attribute ~loc
          ~mode:alloc_heap ~ret_mode:not_alloc_stack
     | Some (val_caselist, partial, body_sort) ->
         let val_cases = transl_cases ~scopes return_layout val_caselist in
@@ -3313,9 +3324,10 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
         lfunction ~kind:(Curried {nlocal=0})
           ~params:[mk_param param param_duid body_layout]
           ~return:return_layout ~attr:default_function_attribute
-          ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack
+          ~loc ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack
   in
   let exn_fun =
+    let scopes = enter_handler_scope ~scopes in
     let exn_cases = transl_cases ~scopes return_layout exn_caselist in
     let param, param_duid =
       Typecore.name_cases ~pattern_kind:Exception_pattern "exn" exn_caselist
@@ -3327,10 +3339,11 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid layout_exception] ~return:return_layout
-      ~attr:default_function_attribute ~loc:Loc_unknown ~body
-      ~mode:alloc_heap ~ret_mode:not_alloc_stack
+      ~attr:default_function_attribute ~loc:(of_location ~scopes e.exp_loc)
+      ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack
   in
   let eff_fun =
+    let scopes = enter_handler_scope ~scopes in
     let param, param_duid =
       Typecore.name_cases ~pattern_kind:Effect_pattern "eff" eff_caselist
     in
@@ -3346,13 +3359,16 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
       ~params:[mk_param param param_duid Lambda.layout_block;
                mk_param cont Lambda.debug_uid_none Lambda.layout_function;
                mk_param cont_tail Lambda.debug_uid_none Lambda.layout_function]
-      ~return:return_layout ~attr:default_function_attribute ~loc:Loc_unknown
+      ~return:return_layout ~attr:default_function_attribute
+      ~loc:(of_location ~scopes e.exp_loc)
       ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack
   in
   (* Upstream decomposes [body] into [f x] when it is an application, avoiding
      the thunk. We always use the thunk path because we cannot verify that the
      arg has layout [value] from [Lapply]. *)
   let (body_fun, arg) =
+    let body_loc = body.exp_loc in
+    let scopes = enter_handler_scope ~scopes in
     let body =
       maybe_region_layout body_layout (transl_exp ~scopes body_layout body)
     in
@@ -3360,7 +3376,7 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
     (lfunction ~kind:(Curried {nlocal=0})
        ~params:[mk_param param Lambda.debug_uid_none Lambda.layout_int]
        ~return:body_layout
-       ~attr:default_function_attribute ~loc:Loc_unknown
+       ~attr:default_function_attribute ~loc:(of_location ~scopes body_loc)
        ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack,
      Lconst(Const_base(Const_int 0)))
   in
