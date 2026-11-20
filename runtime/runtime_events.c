@@ -707,7 +707,11 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
 
   uintnat index = atomic_fetch_add(&runtime_custom_event_index, 1);
 
-  if (index > RUNTIME_EVENTS_MAX_CUSTOM_EVENTS) {
+  if (index >= RUNTIME_EVENTS_MAX_CUSTOM_EVENTS) {
+    /* Saturate so that rejected calls cannot wrap the counter and reissue
+       an id. */
+    atomic_store_relaxed(&runtime_custom_event_index,
+                         RUNTIME_EVENTS_MAX_CUSTOM_EVENTS);
     caml_invalid_argument(
       "Runtime_events.User.register: maximum number of custom events exceeded");
   }
@@ -730,7 +734,7 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
   //  tag: tag;
   //}
   event = caml_alloc_small(4, 0);
-  Field(event, 0) = Val_int(index);
+  Field(event, 0) = Val_int((intnat) index);
   Field(event, 1) = event_name;
   Field(event, 2) = event_type;
   Field(event, 3) = event_tag;
@@ -748,7 +752,7 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
 
   if (atomic_load_acquire(&runtime_events_enabled)) {
     // Ring buffer is already available, we register the name
-    events_register_write_buffer(index, event_name);
+    events_register_write_buffer((int) index, event_name);
   }
 
   // event is added to the list of known events
