@@ -34,6 +34,10 @@ OCaml 5.4.1
 - #15229 Bound the custom event payload by the buffer's own constant
   (Tim McGilchrist, review by Sadiq Jaffer)
 
+- #15371, #15390: Preserve runtime event integers and custom event type IDs
+  at full width, and check the custom event registration limit.
+  (KC Sivaramakrishnan, review by Stefan Muenzel)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
